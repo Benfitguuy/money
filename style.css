@@ -311,3 +311,10 @@ body.th-money .pos{color:#4E7F55}
 .xrow.adj{opacity:.7} .xrow.future{opacity:.55}
 /* 錢包 App：沒有底部分頁，主畫面留出安全區 */
 .mscroll{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)}
+
+/* 小島：走路動畫 */
+.pet.moving .walk{animation:hop .35s ease-in-out infinite}
+@keyframes hop{50%{transform:translateY(-1.5px)}}
+.pet.moving .leg.l1{animation:legs .35s ease-in-out infinite;transform-box:fill-box;transform-origin:top}
+.pet.moving .leg.l2{animation:legs .35s ease-in-out infinite reverse;transform-box:fill-box;transform-origin:top}
+@keyframes legs{0%{transform:rotate(18deg)}100%{transform:rotate(-18deg)}}
