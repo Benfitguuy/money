@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="我們的錢包">
+<meta name="theme-color" content="#E4EEE4">
+<title>我們的錢包</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chiron+GoRound+TC:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="th-money">
+<div id="app">
+  <div id="page-money" class="page">
+    <header>
+      <div class="top">
+        <h1 id="money-title"></h1>
+        <div class="top-btns">
+          <span id="money-monthnav"><button id="money-prev" class="arrow" aria-label="上個月">‹</button><button id="money-next" class="arrow" aria-label="下個月">›</button></span>
+          <button id="money-add" class="round" aria-label="記一筆">＋</button>
+        </div>
+      </div>
+    </header>
+    <div class="mtabs mntabs mt3"><button data-tab="acct">帳戶</button><button data-tab="stat">統計</button><button data-tab="list">明細</button></div>
+    <input type="file" id="csv-file" accept=".csv,text/csv" hidden>
+    <main class="mscroll">
+      <div id="money-list"></div>
+      <div id="money-stat" hidden>
+        <div class="mtabs st-kind"><button data-k="expense">支出</button><button data-k="income">收入</button></div>
+        <div class="mtabs st-by"><button data-b="cat">依分類</button><button data-b="acct">依帳戶</button></div>
+        <div id="money-stat-body"></div>
+      </div>
+      <div id="money-acct" hidden></div>
+    </main>
+  </div>
+</div>
+<div id="sheetwrap" hidden><div id="sheet"></div></div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
