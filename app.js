@@ -1,7 +1,7 @@
 'use strict';
 // 我們的錢包（Sarah & Ben 的記帳 App）— 從「我們的行事曆」拆出來的獨立 App
 // 資料存在這支手機（localStorage：our-wallet-v1）；之後接雲端同步時只要換掉 Store。
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const WEEK = '日一二三四五六';
 const NAMES = { ben: '<img class="av" src="icons/boy.svg" alt="">Ben', sarah: '<img class="av" src="icons/girl.svg" alt="">Sarah', both: '♥ 一起' };
 
@@ -148,6 +148,7 @@ function renderMoney() {
     if (!db.accounts.length) h += '<p class="empty">還沒有帳戶。按下面「＋ 新增帳戶」，把信用卡、銀行、現金加進來，輸入現在的餘額就好。</p>';
     h += '<div class="btns"><button class="primary" id="acct-add">＋ 新增帳戶</button><button id="csv-btn">從 DuoPurse 匯入（CSV 檔）</button></div><p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。</p>';
     $('#money-acct').innerHTML = renderIsland(net) + h;
+    startPets();
     $('#acct-add').onclick = () => openAccount(null);
     $('#csv-btn').onclick = () => $('#csv-file').click();
   }
@@ -369,6 +370,51 @@ function reconcileAccounts() {     // 匯入後確認每個帳戶現在的實際
   };
 }
 
+// ---------- 島上的小動物自由走動（布偶貓、卡爾比犬） ----------
+let petRaf = 0;
+function walkable(x, y) {
+  if (Math.abs(x - 190) / 160 + Math.abs(y - 121) / 86 > 0.8) return false;          // 島的邊緣
+  if (((x - 271) / 48) ** 2 + ((y - 128) / 32) ** 2 < 1) return false;               // 池塘
+  if (x > 140 && x < 206 && y > 80 && y < 128) return false;                          // 房子
+  if (x > 76 && x < 132 && y > 108 && y < 142) return false;                          // 車子
+  return true;
+}
+function randomSpot() { for (let i = 0; i < 60; i++) { const x = 50 + Math.random() * 280, y = 60 + Math.random() * 130; if (walkable(x, y)) return [x, y]; } return [190, 170]; }
+function startPets() {
+  cancelAnimationFrame(petRaf);
+  const pets = ['pet-cat', 'pet-dog'].map((id, i) => {
+    const el = document.getElementById(id); if (!el) return null;
+    const [x, y] = i ? [230, 160] : [150, 150];
+    return { el, x, y, tx: x, ty: y, wait: 500 + i * 900, speed: i ? 22 : 14, dir: 1 };
+  }).filter(Boolean);
+  let last = performance.now();
+  const step = now => {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!document.body.contains(pets[0] && pets[0].el)) return;          // 換頁後就停
+    for (const p of pets) {
+      if (p.wait > 0) { p.wait -= dt * 1000; p.el.classList.remove('moving'); }
+      else {
+        const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+        if (d < 1) { [p.tx, p.ty] = randomSpot(); p.wait = 800 + Math.random() * 2500; }
+        else {
+          const v = Math.min(d, p.speed * dt), nx = p.x + dx / d * v, ny = p.y + dy / d * v;
+          if (walkable(nx, ny) || !walkable(p.x, p.y)) { p.x = nx; p.y = ny; } else { [p.tx, p.ty] = randomSpot(); }
+          if (Math.abs(dx) > 0.5) p.dir = dx > 0 ? 1 : -1;
+          p.el.classList.add('moving');
+        }
+      }
+      p.el.setAttribute('transform', `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);
+      p.el.firstElementChild.setAttribute('transform', `scale(${p.dir},1)`);
+    }
+    // 前後順序：越下面的越靠前
+    const svg = pets[0].el.ownerSVGElement;
+    [...svg.querySelectorAll('.pet,.person,.car')].sort((a, b) => yOf(a) - yOf(b)).forEach(n => svg.appendChild(n));
+    petRaf = requestAnimationFrame(step);
+  };
+  petRaf = requestAnimationFrame(step);
+}
+const yOf = el => { const m = /translate\([^,]+,([\d.]+)\)/.exec(el.getAttribute('transform') || ''); return m ? +m[1] : 0; };
+
 // ---------- 帳戶頁上方的小島（會動的雲、水、兩個人；顯示淨資產） ----------
 function renderIsland(net) {
   const mon = ymd(new Date()).slice(0, 7);
@@ -391,8 +437,38 @@ function renderIsland(net) {
     <g transform="translate(150,70)"><rect x="0" y="22" width="44" height="30" rx="4" fill="#fff" stroke="#E2CDB4" stroke-width="2"/>
       <path d="M-6 25 Q-6 22 -3 20 L19 4 Q22 1 25 4 L47 20 Q50 22 50 25Z" fill="#A9CDF0"/><path d="M4 14 L19 4 Q22 1 25 4 L40 14Z" fill="#FBD98A"/><path d="M12 8.6 L19 4 Q22 1 25 4 L32 8.6Z" fill="#F7B6C8"/>
       <rect x="17" y="34" width="10" height="18" rx="2" fill="#F7B6C8"/><rect x="5" y="30" width="8" height="8" rx="2" fill="#A9CDF0"/><rect x="31" y="30" width="8" height="8" rx="2" fill="#FBD98A"/></g>
-    <image class="bob b1" href="icons/boy.svg" x="164" y="128" width="30" height="30"/>
-    <image class="bob b2" href="icons/girl.svg" x="194" y="130" width="30" height="30"/>
+    <g class="car" transform="translate(104,126)">
+      <ellipse cx="0" cy="13" rx="24" ry="4" fill="#000" opacity=".12"/>
+      <path d="M-22 6 Q-22 -2 -14 -3 L-9 -11 Q-6 -15 0 -15 L9 -15 Q14 -15 17 -10 L20 -3 Q24 -2 24 6 L24 9 Q24 11 22 11 L-20 11 Q-22 11 -22 9Z" fill="#6FA8DC"/>
+      <path d="M-7 -10 Q-5 -12 -2 -12 L2 -12 L2 -4 L-11 -4Z M5 -12 L9 -12 Q12 -12 14 -9 L16 -4 L5 -4Z" fill="#DDEFFB"/>
+      <rect x="-22" y="2" width="5" height="3" rx="1.5" fill="#FBD98A"/><circle cx="-12" cy="11" r="5" fill="#3E3236"/><circle cx="13" cy="11" r="5" fill="#3E3236"/>
+      <circle cx="-12" cy="11" r="2" fill="#C9C9C9"/><circle cx="13" cy="11" r="2" fill="#C9C9C9"/></g>
+    <g class="person" transform="translate(178,156)"><g class="bob b1">
+      <ellipse cx="0" cy="0" rx="9" ry="2.5" fill="#000" opacity=".12"/>
+      <rect x="-5" y="-12" width="4" height="12" rx="2" fill="#5A4048"/><rect x="1" y="-12" width="4" height="12" rx="2" fill="#5A4048"/>
+      <path d="M-9 -12 Q-9 -26 0 -26 Q9 -26 9 -12Z" fill="#9A93DE"/>
+      <image href="icons/boy.svg" x="-14" y="-50" width="28" height="28"/></g></g>
+    <g class="person" transform="translate(206,158)"><g class="bob b2">
+      <ellipse cx="0" cy="0" rx="9" ry="2.5" fill="#000" opacity=".12"/>
+      <rect x="-4.5" y="-10" width="3.5" height="10" rx="1.75" fill="#F2D4BF"/><rect x="1" y="-10" width="3.5" height="10" rx="1.75" fill="#F2D4BF"/>
+      <path d="M-10 -9 Q-7 -26 0 -26 Q7 -26 10 -9Z" fill="#9CC76E"/>
+      <image href="icons/girl.svg" x="-14" y="-50" width="28" height="28"/></g></g>
+    <g id="pet-cat" class="pet"><g class="flip"><g class="walk">
+      <ellipse cx="0" cy="0" rx="11" ry="2.5" fill="#000" opacity=".12"/>
+      <path d="M-10 -9 Q-20 -12 -18 -22 Q-17 -26 -14 -24" stroke="#6B4C3B" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <rect class="leg l1" x="-8" y="-6" width="3.5" height="6" rx="1.7" fill="#6B4C3B"/><rect class="leg l2" x="4" y="-6" width="3.5" height="6" rx="1.7" fill="#6B4C3B"/>
+      <ellipse cx="-1" cy="-9" rx="12" ry="6.5" fill="#F6EEE2"/><ellipse cx="-3" cy="-6" rx="7" ry="3" fill="#FFFFFF"/>
+      <path d="M6 -22 L8 -29 L11 -23Z M13 -23 L17 -29 L17 -21Z" fill="#6B4C3B"/>
+      <circle cx="12" cy="-16" r="7.5" fill="#F6EEE2"/><ellipse cx="13" cy="-15" rx="4.5" ry="4" fill="#8A6A55" opacity=".75"/>
+      <circle cx="10.5" cy="-17" r="1.5" fill="#6FA8DC"/><circle cx="15.5" cy="-17" r="1.5" fill="#6FA8DC"/><circle cx="13" cy="-14" r=".9" fill="#3E2C30"/></g></g></g>
+    <g id="pet-dog" class="pet"><g class="flip"><g class="walk">
+      <ellipse cx="0" cy="0" rx="13" ry="2.8" fill="#000" opacity=".12"/>
+      <path d="M-12 -12 Q-20 -10 -21 -3" stroke="#2E2A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <rect class="leg l1" x="-10" y="-7" width="4" height="7" rx="2" fill="#C98A4B"/><rect class="leg l2" x="5" y="-7" width="4" height="7" rx="2" fill="#C98A4B"/>
+      <ellipse cx="-2" cy="-11" rx="13" ry="6.5" fill="#2E2A2A"/><ellipse cx="7" cy="-9" rx="4" ry="4" fill="#C98A4B"/>
+      <path d="M8 -22 L9 -32 L13 -24Z M14 -24 L18 -33 L19 -23Z" fill="#2E2A2A"/>
+      <ellipse cx="14" cy="-19" rx="7" ry="6.5" fill="#2E2A2A"/><path d="M15 -17 Q22 -17 23 -14 Q20 -12 15 -13Z" fill="#C98A4B"/>
+      <circle cx="22.5" cy="-15" r="1.3" fill="#1A1515"/><circle cx="13" cy="-21" r="1" fill="#C98A4B"/><circle cx="14.5" cy="-20" r="1.2" fill="#fff"/><circle cx="14.7" cy="-20" r=".7" fill="#1A1515"/></g></g></g>
   </svg>
   <div class="isl-net"><span>我們的淨資產</span><b class="${net >= 0 ? 'pos' : 'neg'}">${money(net)}</b><em class="${status[1]}">${status[0]}</em></div></div>`;
 }
