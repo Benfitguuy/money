@@ -148,7 +148,7 @@ const rebateText = (cash, miles) => [cash ? money(cash) : '', miles ? num1(miles
 function renderMoney() {
   const [y, m] = moneyMonth.split('-').map(Number);
   const td = new Date();
-  if (moneyTab === 'acct') $('#money-title').innerHTML = `歡迎回來<small class="hello-date">今天是 ${td.getMonth() + 1}月${td.getDate()}日（${'日一二三四五六'[td.getDay()]}）</small>`;
+  if (moneyTab === 'acct') $('#money-title').innerHTML = `歡迎回來<svg class="hello-cat" viewBox="-14 -38 40 40" aria-hidden="true"><g>${charCat('hellocatmask')}</g><path class="wave" d="M20 -14 q4 -6 2 -12" stroke="#F2C14E" stroke-width="2" fill="none" stroke-linecap="round"/><path class="wave w2" d="M24 -12 q5 -7 3 -14" stroke="#F2C14E" stroke-width="2" fill="none" stroke-linecap="round"/></svg><small class="hello-date">今天是 ${td.getMonth() + 1}月${td.getDate()}日（${'日一二三四五六'[td.getDay()]}）</small>`;
   else $('#money-title').textContent = { ins: '保險', pts: '點數', set: '設定' }[moneyTab] || `${y}年${m}月`;
   $('#money-add').hidden = moneyTab !== 'acct';                       // v1.5：只有帳戶頁有右上角「記一筆」
   $('#money-new').hidden = moneyTab !== 'ins' && moneyTab !== 'pts';  // 保險、點數的「新增」放在右上角
@@ -643,25 +643,44 @@ function walkable(x, y) {
   return true;
 }
 function randomSpot() { for (let i = 0; i < 60; i++) { const x = 50 + Math.random() * 280, y = 60 + Math.random() * 130; if (walkable(x, y)) return [x, y]; } return [190, 170]; }
-function startPets() {
+function startPets() {         // v2.0：貓、狗、Ben、Sarah 都在島上自由走動；Ben 和 Sarah 偶爾走到彼此旁邊冒愛心
   cancelAnimationFrame(petRaf);
-  const pets = ['pet-cat', 'pet-dog'].map((id, i) => {
+  const cfg = [['pet-cat', 150, 150, 14, .95], ['pet-dog', 230, 160, 22, 1.1], ['p-ben', 140, 172, 11, 1, 1], ['p-sarah', 168, 178, 11, 1, 1]];
+  const all = cfg.map(([id, x, y, speed, size, person]) => {
     const el = document.getElementById(id); if (!el) return null;
-    const [x, y] = i ? [230, 160] : [150, 150];
-    return { el, x, y, tx: x, ty: y, wait: 500 + i * 900, speed: i ? 22 : 14, dir: 1, size: i ? 1.1 : 0.95 };
+    return { id, el, x, y, tx: x, ty: y, wait: 800 + Math.random() * 2500, speed, dir: 1, size, person: !!person };
   }).filter(Boolean);
+  if (!all.length) return;
+  const ben = all.find(p => p.id === 'p-ben'), sarah = all.find(p => p.id === 'p-sarah'), heart = document.getElementById('isl-heart');
+  let nextMeet = performance.now() + 9000 + Math.random() * 8000, meeting = null;
   let last = performance.now();
   const step = now => {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (!document.body.contains(pets[0] && pets[0].el)) return;          // 換頁後就停
-    for (const p of pets) {
+    if (!document.body.contains(all[0].el)) return;          // 換頁後就停
+    // 互動：其中一個走去找另一個，碰到就面對面、冒愛心
+    if (ben && sarah && !meeting && now > nextMeet) {
+      const [a, b] = Math.random() < .5 ? [sarah, ben] : [ben, sarah];
+      const side = b.x > 190 ? -16 : 16;
+      if (walkable(b.x + side, b.y + 2)) { meeting = { a, b, t0: now }; a.tx = b.x + side; a.ty = b.y + 2; a.wait = 0; b.wait = 99999; }
+      nextMeet = now + 14000 + Math.random() * 12000;
+    }
+    if (meeting) {
+      const { a, b } = meeting;
+      if (Math.hypot(a.x - a.tx, a.y - a.ty) < 1.2 && !meeting.met) {
+        meeting.met = now; a.wait = b.wait = 2800; a.dir = b.x > a.x ? 1 : -1; b.dir = -a.dir;
+        if (heart) { heart.setAttribute('transform', `translate(${((a.x + b.x) / 2).toFixed(1)},${(Math.min(a.y, b.y) - 58).toFixed(1)})`); heart.classList.remove('pop'); void heart.getBBox(); heart.classList.add('pop'); }
+      }
+      if (meeting.met && now - meeting.met > 2900) meeting = null;
+      else if (!meeting.met && now - meeting.t0 > 12000) { b.wait = 500; meeting = null; }     // 走太久就算了
+    }
+    for (const p of all) {
       if (p.wait > 0) { p.wait -= dt * 1000; p.el.classList.remove('moving'); }
       else {
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
-        if (d < 1) { [p.tx, p.ty] = randomSpot(); p.wait = 800 + Math.random() * 2500; }
+        if (d < 1) { if (!meeting || meeting.a !== p) { [p.tx, p.ty] = randomSpot(); p.wait = (p.person ? 2500 : 800) + Math.random() * 3000; } }
         else {
           const v = Math.min(d, p.speed * dt), nx = p.x + dx / d * v, ny = p.y + dy / d * v;
-          if (walkable(nx, ny) || !walkable(p.x, p.y)) { p.x = nx; p.y = ny; } else { [p.tx, p.ty] = randomSpot(); }
+          if (walkable(nx, ny) || !walkable(p.x, p.y)) { p.x = nx; p.y = ny; } else { [p.tx, p.ty] = randomSpot(); if (meeting && meeting.a === p) { meeting.b.wait = 500; meeting = null; } }
           if (Math.abs(dx) > 0.5) p.dir = dx > 0 ? 1 : -1;
           p.el.classList.add('moving');
         }
@@ -670,8 +689,9 @@ function startPets() {
       p.el.firstElementChild.setAttribute('transform', `scale(${p.dir * p.size},${p.size})`);
     }
     // 前後順序：越下面的越靠前
-    const svg = pets[0].el.ownerSVGElement;
+    const svg = all[0].el.ownerSVGElement;
     [...svg.querySelectorAll('.pet,.person,.car')].sort((a, b) => yOf(a) - yOf(b)).forEach(n => svg.appendChild(n));
+    if (heart) svg.appendChild(heart);
     petRaf = requestAnimationFrame(step);
   };
   petRaf = requestAnimationFrame(step);
@@ -723,8 +743,8 @@ function renderIsland(net) {
       <path d="M-7 -10 Q-5 -12 -2 -12 L2 -12 L2 -4 L-11 -4Z M5 -12 L9 -12 Q12 -12 14 -9 L16 -4 L5 -4Z" fill="#DDEFFB"/>
       <rect x="-22" y="2" width="5" height="3" rx="1.5" fill="#FBD98A"/><circle cx="-12" cy="11" r="5" fill="#3E3236"/><circle cx="13" cy="11" r="5" fill="#3E3236"/>
       <circle cx="-12" cy="11" r="2" fill="#C9C9C9"/><circle cx="13" cy="11" r="2" fill="#C9C9C9"/></g>
-    <g class="person" transform="translate(140,172)"><g class="bob b1">${charBen()}</g></g>
-    <g class="person" transform="translate(168,178)"><g class="bob b2">${charSarah()}</g></g>
+    <g class="person" id="p-ben" transform="translate(140,172)"><g class="flip"><g class="bob b1">${charBen()}</g></g></g>
+    <g class="person" id="p-sarah" transform="translate(168,178)"><g class="flip"><g class="bob b2">${charSarah()}</g></g></g>
     <g id="pet-cat" class="pet"><g class="flip"><g class="walk">${charCat('isl-catmask')}</g></g></g>
     <g id="pet-dog" class="pet"><g class="flip"><g class="walk">
       <ellipse cx="0" cy="0" rx="13" ry="2.8" fill="#000" opacity=".12"/>
@@ -734,6 +754,7 @@ function renderIsland(net) {
       <path d="M8 -22 L9 -32 L13 -24Z M14 -24 L18 -33 L19 -23Z" fill="#2E2A2A"/>
       <ellipse cx="14" cy="-19" rx="7" ry="6.5" fill="#2E2A2A"/><path d="M15 -17 Q22 -17 23 -14 Q20 -12 15 -13Z" fill="#C98A4B"/>
       <circle cx="22.5" cy="-15" r="1.3" fill="#1A1515"/><circle cx="13" cy="-21" r="1" fill="#C98A4B"/><circle cx="14.5" cy="-20" r="1.2" fill="#fff"/><circle cx="14.7" cy="-20" r=".7" fill="#1A1515"/></g></g></g>
+    <g id="isl-heart" class="isl-emote" opacity="0"><path d="M0 0 c-3 -5 -10 -3 -9 3 c1 4 9 9 9 9 s8 -5 9 -9 c1 -6 -6 -8 -9 -3z" fill="#F28CA8" transform="translate(0,-8)"/></g>
   </svg>
   <div class="isl-net"><span>我們的淨資產</span><b class="${net >= 0 ? 'pos' : 'neg'}">${money(net)}</b><em class="${status[1]}">${status[0]}</em></div></div>`;
 }
