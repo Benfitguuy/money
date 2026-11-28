@@ -147,7 +147,7 @@ const rebateText = (cash, miles) => [cash ? money(cash) : '', miles ? num1(miles
 // ---------- 畫面 ----------
 function renderMoney() {
   const [y, m] = moneyMonth.split('-').map(Number);
-  $('#money-title').textContent = { acct: '我們的錢包', ins: '保險', pts: '航空點數', set: '設定' }[moneyTab] || `${y}年${m}月`;
+  $('#money-title').textContent = { acct: '我們的錢包', ins: '保險', pts: '點數', set: '設定' }[moneyTab] || `${y}年${m}月`;
   $('#money-add').hidden = moneyTab !== 'acct';                       // v1.5：只有帳戶頁有右上角「記一筆」
   $('#money-new').hidden = moneyTab !== 'ins' && moneyTab !== 'pts';  // 保險、點數的「新增」放在右上角
   $('#money-new').textContent = moneyTab === 'ins' ? '＋ 新增保單' : '＋ 新增航空公司';
@@ -723,7 +723,7 @@ function bindMoney() {
   $('#money-prev').onclick = () => { const [y, m] = moneyMonth.split('-').map(Number); moneyMonth = ymd(new Date(y, m - 2, 1)).slice(0, 7); renderMoney(); };
   $('#money-next').onclick = () => { const [y, m] = moneyMonth.split('-').map(Number); moneyMonth = ymd(new Date(y, m, 1)).slice(0, 7); renderMoney(); };
   $('#money-add').onclick = () => openExpense(null);
-  $('#money-new').onclick = () => moneyTab === 'ins' ? editIns(null) : editProg(null);
+  $('#money-new').onclick = () => moneyTab === 'ins' ? editIns(null) : ptsTab === 'promo' ? editPromo(null) : editProg(null);
   $('#money-list').onclick = e => { const b = e.target.closest('.xrow'); if (!b) return; const x = db.expenses.find(z => z.id === b.dataset.id); if (!x) return;
     if (txType(x) === 'adjust') openAdjust(x); else openExpense(x); };
   document.querySelectorAll('.mntabs button').forEach(b => b.onclick = () => { moneyTab = b.dataset.tab; renderMoney(); $('.mscroll').scrollTop = 0; });
