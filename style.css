@@ -359,3 +359,49 @@ body.th-money .pos{color:#4E7F55}
 #a-cardbox[hidden],#q-cash[hidden],#q-miles[hidden],#q-capbox[hidden]{display:none}
 button[disabled]{opacity:.5}
 #sheet .lrow input:focus{outline:none;box-shadow:none;border:0}
+
+/* ===== v1.4 柔和配色（參考 Sarah 給的截圖：米白底、霧面白卡片、柔和綠／玫瑰紅、輕陰影） ===== */
+body.th-money{--bg:#F3F2EE;--card:#FBFBF9;--line:#E7E6E1;--line2:#EFEEEA;--soft:#EAE9E4;--muted:#8E928C;--text:#3F4542;--hi:#E6EEE7;--hi-bd:#6E9478}
+body.th-money .pos{color:#5E8B6B}
+body.th-money .neg{color:#B66C6C}
+body.th-money .round,body.th-money .btns .primary{background:#6E9478;color:#fff}
+body.th-money header{background:rgba(243,242,238,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+body.th-money .card,body.th-money .list,body.th-money .arow,body.th-money .pcard{background:linear-gradient(160deg,#FDFDFC,#F4F5F2);border:0;border-radius:22px;
+  box-shadow:0 8px 24px rgba(70,80,70,.07),0 1px 2px rgba(70,80,70,.05)}
+body.th-money .arow{border-radius:18px;margin-bottom:8px;padding:14px}
+body.th-money .island{background:linear-gradient(#EAF0E8,#FAFAF7)}
+body.th-money .mtabs{background:#E9E8E3}
+body.th-money .mtabs button.on{background:#FDFDFC;box-shadow:0 2px 8px rgba(70,80,70,.08)}
+body.th-money .btns button{background:#ECEBE6}
+body.th-money .sec{color:#8E928C}
+body.th-money #sheet{background:#F7F7F4}
+.mscroll{padding-bottom:calc(env(safe-area-inset-bottom) + 100px)}
+/* 底部分頁（五個） */
+.mnav{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:grid;grid-template-columns:repeat(5,1fr);
+  padding:8px 4px 6px;border-radius:28px;background:rgba(251,251,249,.86);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  box-shadow:0 10px 30px rgba(60,70,60,.14),0 1px 3px rgba(60,70,60,.06);z-index:20}
+.mnav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;color:#9A9E98;padding:2px 0}
+.mnav svg{width:25px;height:25px;fill:#A9ADA7}
+.mnav button.on{color:#5E8B6B;font-weight:700}.mnav button.on svg{fill:#6E9478}
+#toast{z-index:30}
+/* 保險、點數卡片 */
+.pcard{display:flex;flex-direction:column;gap:6px;width:100%;padding:14px 16px;margin-bottom:10px;text-align:left}
+.pc-top{display:flex;align-items:center;gap:10px}
+.pc-ic{width:36px;height:36px;border-radius:12px;background:#E6EEE7;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
+.pc-n{flex:1;display:flex;flex-direction:column;font-size:17px;font-weight:700}
+.pc-n small,.pc-last{font-size:12px;color:var(--muted);font-weight:400}
+.pc-bal{font-size:28px;font-weight:800;color:#5E8B6B;letter-spacing:.5px}.pc-bal small{font-size:14px;color:var(--muted)}
+.pc-row{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.pc-row b{font-size:18px}.pc-row small{font-size:12px;color:var(--muted)}.pc-row .sp{flex:1}
+.tag{font-style:normal;font-size:12px;padding:3px 8px;border-radius:999px;background:#F6EBDD;color:#9A6A33}
+.tag.ok{background:#E3EEE5;color:#4E7F59}
+.fsec{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:#6E9478;margin:18px 2px 0;letter-spacing:1px}
+.rider{display:grid;grid-template-columns:1fr 90px 34px;gap:6px;margin-top:8px}
+.rider .r-x{color:var(--muted);font-size:16px}
+.seg5{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.seg5 button{padding:9px 0;border-radius:12px;background:var(--soft);font-size:13px;border:2px solid transparent}
+.seg5 button.on{background:#E6EEE7;border-color:#6E9478;color:#3F5F47;font-weight:700}
+#sheet select,#sheet textarea{width:100%;font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--text)}
+#sheet textarea{resize:vertical}
+.tomiles{display:block;margin:2px 0 6px auto;font-size:13px}
+.inl input{min-width:0}
+[hidden]{display:none!important}
