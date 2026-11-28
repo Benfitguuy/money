@@ -389,16 +389,15 @@ function editAccount(a, back, draft) {
   const bal = a ? acctBalance(a) : '';
   const balVal = draft ? draft.bal : (a ? Math.abs(v.type === 'credit' ? Math.min(0, bal) : bal) : '');
   let type = v.type;
-  let bank = BANKS.includes(v.name) ? v.name : (v.name && v.type !== 'cash' ? '__other' : '');      // v2.6 從清單選
+  const bank = '__other';                     // v2.7 帳戶名稱改回自己打（不用清單）
   let pm = v.payMode === 'day' || (!v.payMode && v.payDay) ? 'day' : 'free';
   const FREE = [44, 45, 50, 55, 62];
   openSheet(`
     <div class="shead"><button class="txt" id="a-cancel">${back ? '‹ 返回' : '取消'}</button><b>${isNew ? '新增帳戶' : '修改帳戶'}</b><button class="txt strong" id="a-save">儲存</button></div>
     <label>種類</label>
     <div class="seg seg3" id="a-type">${ACCT_TYPES.map(([k, i, n]) => `<button type="button" data-k="${k}" class="${k === v.type ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
-    <div id="a-namebox"><label>哪一家</label>
-      <div class="bankchips" id="a-banks">${BANKS.map(b => `<button type="button" data-b="${b}" class="${bank === b ? 'on' : ''}">${b}</button>`).join('')}<button type="button" data-b="__other" class="${bank === '__other' ? 'on' : ''}">✏️ 其他</button></div>
-      <input id="a-name" value="${bank === '__other' ? esc(v.name) : ''}" placeholder="自己取名，例如：ANZ 儲蓄、大白"${bank === '__other' ? '' : ' hidden'}>
+    <div id="a-namebox"><label>帳戶名稱</label>
+      <input id="a-name" value="${v.type === 'cash' ? '' : esc(v.name)}" placeholder="例如：Comm、ANZ、ING、Amex、NAB">
       <p class="hint" id="a-namehint"></p>
       <label>卡號或帳號末四碼 <span class="opt-tag">可不填</span></label><input id="a-last4" inputmode="numeric" maxlength="4" value="${esc(v.last4 || '')}" placeholder="1234"></div>
     <div id="a-cardbox"><label>每月幾號結算</label>
@@ -429,15 +428,12 @@ function editAccount(a, back, draft) {
   const paint = () => {
     $('#a-bal-l').textContent = type === 'credit' ? '現在欠多少（未繳的卡費）' : '現在有多少錢';
     $('#a-cardbox').hidden = type !== 'credit'; $('#a-namebox').hidden = type === 'cash';
-    $('#a-name').hidden = bank !== '__other';
-    $('#a-namehint').textContent = bank && bank !== '__other' && db.accounts.some(z => z !== a && z.name === bank && z.type === type) ? `已經有一個 ${bank} 了。要分開的話按「其他」取名，例如「${bank} 儲蓄」。` : '';
+    $('#a-namehint').textContent = '';
     paintDue();
   };
   paint();
   $('#a-type').onclick = e => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.k;
     $('#a-type').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
-  $('#a-banks').onclick = e => { const b = e.target.closest('button'); if (!b) return; bank = b.dataset.b;
-    $('#a-banks').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); if (bank === '__other') $('#a-name').focus(); };
   $('#a-pm').onclick = e => { const b = e.target.closest('button'); if (!b) return; pm = b.dataset.pm;
     $('#a-pm').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paintDue(); };
   $('#a-fds').onclick = e => { const b = e.target.closest('button'); if (!b) return; $('#a-fd').value = b.dataset.fd; paintDue(); };
@@ -450,7 +446,7 @@ function editAccount(a, back, draft) {
   $('#sheet').querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { const d = keep(); editPlan(d, plans[+b.dataset.pn], () => editAccount(a, back, d)); });
   $('#a-save').onclick = () => {
     const name = curName();
-    if (!name) return $('#a-err').textContent = bank === '__other' ? '請寫帳戶名稱' : '請選是哪一家';
+    if (!name) return $('#a-err').textContent = '請寫帳戶名稱';
     let want = parseFloat($('#a-bal').value) || 0;
     if (type === 'credit') want = -Math.abs(want);
     const sd = parseInt($('#a-sd').value, 10);
