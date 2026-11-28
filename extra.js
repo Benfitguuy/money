@@ -258,7 +258,12 @@ function editIns(src) {
   draw();
 }
 
-// ---------- 設定頁（v1.5）：帳戶（新增、匯入 CSV）、消費分類、收入分類 ----------
+// ---------- 設定頁（v1.5）：帳戶（新增、匯入 CSV）、收入分類、支出分類（v2.1 改名＋小花） ----------
+const FLOWERS = (n = 7, h = 34) => `<svg class="flowers" viewBox="0 0 ${n * 30} ${h}" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${Array.from({ length: n }, (_, i) => {
+  const x = 15 + i * 30, c = ['#F6B6C8', '#FBD98A', '#C9B6EA', '#F8F0E3', '#F7A8A0', '#B9DDF2'][i % 6], t = 6 + (i * 7) % 10;
+  return `<g class="sway" style="animation-delay:${-i * .37}s;transform-origin:${x}px ${h}px"><path d="M${x} ${h} Q${x - 2} ${h - 10} ${x} ${t + 6}" stroke="#7DB476" stroke-width="1.6" fill="none"/>
+    <ellipse cx="${x - 4}" cy="${h - 8}" rx="3.5" ry="1.6" fill="#8CC383" transform="rotate(-30 ${x - 4} ${h - 8})"/>
+    ${[0, 72, 144, 216, 288].map(a => `<ellipse cx="${x}" cy="${t}" rx="2.6" ry="4.2" fill="${c}" transform="rotate(${a} ${x} ${t + 4}) translate(0 0)"/>`).join('')}<circle cx="${x}" cy="${t + 4}" r="2.2" fill="#F2C14E"/></g>`; }).join('')}</svg>`;
 const CAT_ICONS = ['🍴', '☕', '🛒', '🏠', '🚗', '⛽', '🚌', '✈️', '🎮', '🎬', '🏋️', '➕', '💊', '📶', '📱', '🎁', '🛍️', '👗', '💼', '🐱', '🐶', '👶', '📚', '💡', '💰', '🎉', '↩️', '💳', '🏦', '📦', '🏷️'];
 const CAT_COLORS = ['#F6E3D6', '#DDE6F5', '#E7E0F5', '#F5DDE5', '#F4EED8', '#DFEEDD', '#F1E0DC', '#F7E7D3', '#E2E8EE', '#E9E9E6', '#DCEBDA'];
 const LOCKED = ['other', 'other_in', 'rebate'];          // 系統會用到，不能刪（可以改名）
@@ -268,9 +273,9 @@ function renderSet() {
     <div class="sec">帳戶</div>
     <div class="list"><button class="lrow" id="set-acct"><span class="ci">➕</span><span class="lv big">新增帳戶<small>信用卡、銀行、現金</small></span><span class="chev">›</span></button>
       <button class="lrow" id="set-csv"><span class="ci">📄</span><span class="lv big">匯入 CSV 檔案<small>從原本的記帳 App 匯出的檔案</small></span><span class="chev">›</span></button></div>
-    <div class="sec">分類</div>
-    <div class="list"><button class="lrow" id="set-exp"><span class="ci" style="background:#F6E3D6">🍴</span><span class="lv big">消費分類<small>${n('expense')} 個</small></span><span class="chev">›</span></button>
-      <button class="lrow" id="set-inc"><span class="ci" style="background:#DCEBDA">💰</span><span class="lv big">收入分類<small>${n('income')} 個</small></span><span class="chev">›</span></button></div>
+    <div class="sec sec-fl"><span>🌼 分類</span>${FLOWERS(5, 26)}</div>
+    <div class="list"><button class="lrow" id="set-inc"><span class="ci" style="background:#DCEBDA">💰</span><span class="lv big">收入分類<small>${n('income')} 個</small></span><span class="chev">›</span></button>
+      <button class="lrow" id="set-exp"><span class="ci" style="background:#F6E3D6">🍴</span><span class="lv big">支出分類<small>${n('expense')} 個</small></span><span class="chev">›</span></button></div>
     <p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。資料只存在這支手機。</p>`;
   $('#set-acct').onclick = () => openAccount(null);
   $('#set-csv').onclick = () => $('#csv-file').click();
@@ -280,10 +285,11 @@ function renderSet() {
 function manageCats(kind) {
   const used = k => db.expenses.filter(x => x.cat === k).length;
   const list = catsOf(kind);
-  openSheet(`<div class="shead"><button class="txt" id="m-close">完成</button><b>${kind === 'income' ? '收入' : '消費'}分類</b><button class="txt strong" id="m-add">＋ 新增</button></div>
+  openSheet(`<div class="shead"><button class="txt" id="m-close">完成</button><b>${kind === 'income' ? '收入' : '支出'}分類</b><button class="txt strong" id="m-add">＋ 新增</button></div>
+    <div class="flower-strip">${FLOWERS(9, 36)}</div>
     <div class="list">${list.map((c, n) => `<div class="lrow catm"><button class="cm-main" data-k="${c.k}">${catIcon(c.k)}<span class="lv big">${esc(c.name)}<small>${c.subs.length ? c.subs.length + ' 個子項目・' : ''}${used(c.k)} 筆</small></span></button>
       <span class="cm-grip" aria-hidden="true">≡</span></div>`).join('')}</div>
-    <p class="hint">點分類可以改名字、圖示、顏色、子項目。<b>久按一下再上下拖</b>可以排順序（記一筆時照這個順序）。</p>`);
+    <p class="hint">🌷 點分類可以改名字、圖示、顏色、子項目。<b>久按一下再上下拖</b>可以排順序（記一筆時照這個順序）。</p>`);
   $('#m-close').onclick = () => { closeSheet(); renderMoney(); };
   $('#m-add').onclick = () => editCat(kind, null);
   let justDragged = 0;
@@ -313,7 +319,7 @@ function editCat(kind, c) {
     const ic = $('#c-icon').value.trim(); if (ic) v.icon = [...ic].slice(0, 2).join('');
     v.subs = [...$('#sheet').querySelectorAll('.subr input')].map(i => ({ k: i.dataset.k || uid(), name: i.value.trim() })); };
   const draw = () => {
-    openSheet(`<div class="shead"><button class="txt" id="c-cancel">取消</button><b>${isNew ? '新增' : '修改'}${kind === 'income' ? '收入' : '消費'}分類</b><button class="txt strong" id="c-save">儲存</button></div>
+    openSheet(`<div class="shead"><button class="txt" id="c-cancel">取消</button><b>${isNew ? '新增' : '修改'}${kind === 'income' ? '收入' : '支出'}分類</b><button class="txt strong" id="c-save">儲存</button></div>
       <div class="catprev"><span class="ci big" style="background:${v.color}">${v.icon}</span><b>${esc(v.name) || '（名稱）'}</b></div>
       <label>名稱</label><input id="c-name" value="${esc(v.name)}" placeholder="例如：寵物">
       <label>圖示（點一個，或在右邊貼任何表情符號）</label>
