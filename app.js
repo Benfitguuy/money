@@ -359,10 +359,13 @@ function openAccount(a) {
   if (a && a.type === 'credit') return openCard(a);
   editAccount(a);
 }
-function editAccount(a, back) {
+function editAccount(a, back, draft) {
   const isNew = !a;
-  const v = a || { name: '', type: 'bank', last4: '', statementDay: '' };
+  // draft：去編輯回饋方案再回來時，先把表單填的內容收著（方案也先放 draft，按「儲存」才真的存）
+  const v = draft || a || { name: '', type: 'bank', last4: '', statementDay: '', payDay: '' };
+  const plans = draft ? draft.plans : (a && a.plans ? a.plans.map(p => ({ ...p })) : []);
   const bal = a ? acctBalance(a) : '';
+  const balVal = draft ? draft.bal : (a ? Math.abs(v.type === 'credit' ? Math.min(0, bal) : bal) : '');
   let type = v.type;
   openSheet(`
     <div class="shead"><button class="txt" id="a-cancel">${back ? '‹ 返回' : '取消'}</button><b>${isNew ? '新增帳戶' : '修改帳戶'}</b><button class="txt strong" id="a-save">儲存</button></div>
@@ -370,10 +373,16 @@ function editAccount(a, back) {
     <label>種類</label>
     <div class="seg seg3" id="a-type">${ACCT_TYPES.map(([k, i, n]) => `<button type="button" data-k="${k}" class="${k === v.type ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
     <label>卡號或帳號末四碼 <span class="opt-tag">可不填</span></label><input id="a-last4" inputmode="numeric" maxlength="4" value="${esc(v.last4 || '')}" placeholder="1234">
-    <div id="a-cardbox"><label>每月幾號結算 <span class="opt-tag">信用卡，可不填</span></label>
+    <div id="a-cardbox"><div class="row2"><div><label>每月幾號結算 <span class="opt-tag">可不填</span></label>
       <input id="a-sd" type="number" inputmode="numeric" min="1" max="28" value="${v.statementDay || ''}" placeholder="例如：18"></div>
+      <div><label>每月幾號繳費 <span class="opt-tag">可不填</span></label>
+      <input id="a-pd" type="number" inputmode="numeric" min="1" max="31" value="${v.payDay || ''}" placeholder="例如：5"></div></div>
+      <p class="hint">填了的話，行事曆那天上面會有「💳 結算／繳費」整天提醒。</p>
+      <div class="fsec">回饋方案（里程、現金回饋） <button class="txt strong" id="a-addplan" type="button">＋ 新增</button></div>
+      <div class="list">${plans.length ? plans.map((p, n) => `<button type="button" class="lrow" data-pn="${n}"><span class="lv big">${esc(planLabel(p))}${p.isDefault ? '<small>預設</small>' : ''}${p.cap ? `<small>每期上限 ${p.kind === 'cash' ? money(p.cap) : p.cap + ' 哩'}</small>` : ''}</span><span class="chev">›</span></button>`).join('')
+        : '<p class="empty" style="padding:10px 12px">還沒有回饋方案。例如里程卡：按「＋ 新增」→ 里程回饋 → 每花 A$2.5 累積 1 哩。</p>'}</div></div>
     <label id="a-bal-l"></label>
-    <input id="a-bal" type="number" inputmode="decimal" step="0.01" value="${a ? Math.abs(v.type === 'credit' ? Math.min(0, bal) : bal) : ''}" placeholder="0.00">
+    <input id="a-bal" type="number" inputmode="decimal" step="0.01" value="${balVal}" placeholder="0.00">
     <p class="hint">${isNew ? '輸入現在的金額就好，之後每記一筆會自動加減。' : '如果跟銀行對不起來，直接改成正確金額，App 會自動校正。'}</p>
     <p class="err" id="a-err"></p>
     ${isNew ? '' : '<div class="btns"><button class="danger" id="a-del">刪除帳戶</button></div>'}`);
@@ -383,14 +392,24 @@ function editAccount(a, back) {
     $('#a-type').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
   $('#a-last4').oninput = () => { $('#a-last4').value = $('#a-last4').value.replace(/\D/g, '').slice(0, 4); };
   $('#a-cancel').onclick = back || closeSheet;
+  // 去新增／修改回饋方案：先收好表單，方案頁按儲存或取消都回到這裡
+  const keep = () => ({ name: $('#a-name').value, type, last4: $('#a-last4').value, statementDay: $('#a-sd').value, payDay: $('#a-pd').value, bal: $('#a-bal').value, plans });
+  $('#a-addplan').onclick = () => { const d = keep(); editPlan(d, null, () => editAccount(a, back, d)); };
+  $('#sheet').querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { const d = keep(); editPlan(d, plans[+b.dataset.pn], () => editAccount(a, back, d)); });
   $('#a-save').onclick = () => {
     const name = $('#a-name').value.trim();
     if (!name) return $('#a-err').textContent = '請寫帳戶名稱';
     let want = parseFloat($('#a-bal').value) || 0;
     if (type === 'credit') want = -Math.abs(want);
     const sd = parseInt($('#a-sd').value, 10);
+    const pd = parseInt($('#a-pd').value, 10);
     const acc = a || { id: uid(), init: 0, plans: [], rebates: [] };
-    Object.assign(acc, { name, type, last4: $('#a-last4').value, statementDay: type === 'credit' && sd >= 1 && sd <= 28 ? sd : '' });
+    Object.assign(acc, { name, type, last4: $('#a-last4').value, statementDay: type === 'credit' && sd >= 1 && sd <= 28 ? sd : '', payDay: type === 'credit' && pd >= 1 && pd <= 31 ? pd : '' });
+    if (type === 'credit') {                    // v2.5 方案在這裡存；刪掉的方案，以前套用它的帳改成不套用
+      const ids = new Set(plans.map(p => p.id));
+      db.expenses.forEach(x => { if (x.acct === acc.id && x.plan && !ids.has(x.plan)) x.plan = ''; });
+      acc.plans = plans;
+    }
     if (!a) db.accounts.push(acc);
     acc.init = 0; acc.init = Math.round((want - acctBalance(acc)) * 100) / 100;
     save(); toast('已儲存');
@@ -424,24 +443,24 @@ function openCard(a) {
             : `<button class="txt strong tomiles" data-plan2="${l.p.id}" data-v="${Math.floor(l.v)}" data-note="${esc(nt)}">✈️ 存入${progOf(l.p.prog) ? ' ' + esc(progOf(l.p.prog).airline) : '航空點數'}（${num1(Math.floor(l.v))} 點）</button>`; })() : ''}`).join('')}
       ${r.none ? `<div class="pline"><span>未套用方案</span><b class="muted">消費 ${money(r.none)}</b></div>` : ''}
       <p class="hint">依記帳時套用的方案估算，僅供參考；實際回饋以銀行入帳為準。</p></div>
-    <div class="sec acc-sec"><span>回饋方案</span><button class="txt strong" id="k-addplan">＋ 新增</button></div>
+    <div class="sec acc-sec"><span>回饋方案</span><button class="txt strong" id="k-addplan">設定 ›</button></div>
     <div class="list">${a.plans.length ? a.plans.map(p => `<button class="lrow" data-plan="${p.id}"><span class="lv big">${esc(planLabel(p))}${p.isDefault ? '<small>預設</small>' : ''}${p.cap ? `<small>每期上限 ${p.kind === 'cash' ? money(p.cap) : p.cap + ' 哩'}</small>` : ''}</span><span class="chev">›</span></button>`).join('')
-      : '<p class="empty" style="padding:10px 12px">還沒有回饋方案，按「＋ 新增」設定這張卡的回饋。</p>'}</div>
+      : '<p class="empty" style="padding:10px 12px">還沒有回饋方案，按「設定 ›」（或右上角「編輯」）新增里程、現金回饋。</p>'}</div>
     <div class="sec acc-sec"><span>回饋紀錄（實際拿到的）</span><button class="txt strong" id="k-addreb">＋ 記一筆</button></div>
     <div class="list">${got.length ? got.map(g => `<button class="lrow" data-reb="${g.id}"><span class="lv big">${g.kind === 'cash' ? money(g.value) : num1(g.value) + ' 哩'}<small>${g.date}${g.note ? '・' + esc(g.note) : ''}${g.kind === 'miles' && progOf(g.prog) ? '・已存入 ' + esc(progOf(g.prog).airline) : ''}</small></span><span class="chev">›</span></button>`).join('')
       : '<p class="empty" style="padding:10px 12px">銀行回饋入帳後記在這裡。</p>'}</div>
     ${got.length ? `<p class="hint">累計拿到：${rebateText(got.filter(g => g.kind === 'cash').reduce((s, g) => s + g.value, 0), got.filter(g => g.kind === 'miles').reduce((s, g) => s + g.value, 0))}</p>` : ''}`);
   $('#k-close').onclick = () => { closeSheet(); renderMoney(); };
   $('#k-edit').onclick = () => editAccount(a, () => openCard(a));
-  $('#k-addplan').onclick = () => editPlan(a, null);
+  $('#k-addplan').onclick = () => editAccount(a, () => openCard(a));
   $('#k-addreb').onclick = () => editRebate(a, null);
   $('#sheet').querySelectorAll('.tomiles').forEach(b => b.onclick = () => { const p = a.plans.find(q => q.id === b.dataset.plan2);
     editRebate(a, null, { kind: 'miles', value: +b.dataset.v, prog: p && p.prog, note: b.dataset.note }); });
-  $('#sheet').querySelectorAll('[data-plan]').forEach(b => b.onclick = () => editPlan(a, a.plans.find(p => p.id === b.dataset.plan)));
+  $('#sheet').querySelectorAll('[data-plan]').forEach(b => b.onclick = () => editAccount(a, () => openCard(a)));
   $('#sheet').querySelectorAll('[data-reb]').forEach(b => b.onclick = () => editRebate(a, a.rebates.find(g => g.id === b.dataset.reb)));
 }
 
-function editPlan(a, p) {
+function editPlan(a, p, back) {
   const isNew = !p;
   const v = p || { name: '', kind: 'cash', rate: '', per: '', cap: '', isDefault: !a.plans.some(q => q.isDefault) };
   let kind = v.kind, mode = v.mode || 'per';
@@ -472,7 +491,8 @@ function editPlan(a, p) {
   $('#q-capon').onchange = paint;
   $('#q-mode').onclick = e => { const b = e.target.closest('button'); if (!b) return; mode = b.dataset.m;
     $('#q-mode').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
-  $('#q-cancel').onclick = () => openCard(a);
+  const done = back || (() => openCard(a));
+  $('#q-cancel').onclick = done;
   $('#q-save').onclick = () => {
     const name = $('#q-name').value.trim() || (kind === 'cash' ? '現金回饋' : '里程回饋');
     const rate = parseFloat($('#q-rate').value), per = parseFloat($('#q-per').value), cap = $('#q-capon').checked ? parseFloat($('#q-cap').value) : '';
@@ -484,11 +504,14 @@ function editPlan(a, p) {
     Object.assign(plan, { name, kind, rate: kind === 'cash' ? rate : '', mode, per: kind === 'miles' && mode === 'per' ? per : '', mpd: kind === 'miles' && mode === 'mpd' ? mpd : '', prog: kind === 'miles' ? $('#q-prog').value : '', cap: cap > 0 ? cap : '', isDefault: $('#q-def').checked });
     if (isNew) a.plans.push(plan);
     if (plan.isDefault) a.plans.forEach(q => { if (q !== plan) q.isDefault = false; });
-    save(); toast('已儲存'); openCard(a);
+    if (back) { toast('記得按右上角「儲存」帳戶'); return done(); }
+    save(); toast('已儲存'); done();
   };
   if (!isNew) $('#q-del').onclick = () => {
+    const i = a.plans.indexOf(p); if (i >= 0) a.plans.splice(i, 1);
+    if (back) return done();
     db.expenses.forEach(x => { if (x.plan === p.id) x.plan = ''; });
-    a.plans = a.plans.filter(q => q !== p); save(); toast('已刪除'); openCard(a);
+    save(); toast('已刪除'); done();
   };
 }
 
