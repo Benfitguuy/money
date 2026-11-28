@@ -522,3 +522,9 @@ body.th-money .island{background:linear-gradient(#BFE2F4 0%,#DCF0F4 42%,#F4FAF6 
 .bankchips button.on{background:#EEF4EF;border-color:#6E9478;color:#3F6B4C}
 #a-namebox[hidden],#a-fdbox[hidden],#a-pdbox[hidden],#a-cardbox[hidden]{display:none}
 .due-preview b{color:#B66C6C}
+
+/* v2.9 免息天數、備份 */
+.fdrow{display:flex;align-items:center;gap:8px}.fdrow input{flex:1}.fdrow span{font-weight:700}
+.bkbtns button{display:flex;flex-direction:column;align-items:center;gap:2px}
+.bkbtns button small{font-size:12px;font-weight:600;opacity:.7}
+.bk-info{line-height:1.7;margin:4px 0 0}
