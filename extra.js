@@ -177,18 +177,22 @@ function editLog(p, l, sign0 = 1, fromList = false) {
 
 // ---------- 保險頁 ----------
 function renderIns() {
-  const list = INS().slice().sort((a, b) => (a.start || '') < (b.start || '') ? 1 : -1);
+  const all = INS().slice().sort((a, b) => (a.start || '') < (b.start || '') ? 1 : -1);
+  const list = all.filter(i => !i.ended), done = all.filter(i => i.ended);       // v2.5 已結束的不算保費、放最下面
   const year = list.reduce((s, i) => s + insYear(i), 0);
   let h = `<div class="card"><div class="mgrid2"><div><span>每年保費合計</span><b>${money(year)}</b></div><div><span>平均每月</span><b>${money(year / 12)}</b></div></div>
-    <p class="hint">${list.length} 張保單（主約＋附約一起算）</p></div>`;
-  h += list.map(i => {
+    <p class="hint">${list.length} 張有效保單（主約＋附約一起算）${done.length ? `・${done.length} 張已結束不算` : ''}</p></div>`;
+  const card = i => {
     const pr = i.promo || {}, due = pr.points && i.start && pr.months ? addMonths(i.start, +pr.months) : '';
     const promo = pr.points ? (pr.logId ? `<em class="tag ok">✈️ ${num1(pr.points)} 點已存入</em>` : `<em class="tag">✈️ ${due ? due + ' 可得' : '可得'} ${num1(pr.points)} 點</em>`) : '';
     return `<button class="pcard" data-ins="${i.id}"><span class="pc-top"><span class="pc-ic">🛡️</span><span class="pc-n">${esc(i.name)}<small>${[i.company, i.insured && '被保險人 ' + i.insured].filter(Boolean).map(esc).join('・')}</small></span><span class="chev">›</span></span>
-      <span class="pc-row"><b>${money(insPer(i))}</b><small>／${freqName(i.freq)}${(i.riders || []).length ? `（含附約 ${i.riders.length} 個）` : ''}</small><span class="sp"></span><small>${i.start ? i.start + ' 開始' : ''}</small></span>
+      <span class="pc-row"><b>${money(insPer(i))}</b><small>／${freqName(i.freq)}${(i.riders || []).length ? `（含附約 ${i.riders.length} 個）` : ''}</small><span class="sp"></span><small>${i.ended ? `<em class="tag">已結束${i.endDate ? ' ' + i.endDate : ''}</em>` : i.start ? i.start + ' 開始' : ''}</small></span>
       ${promo || pr.weeks ? `<span class="pc-row">${promo}${pr.weeks ? `<em class="tag">🎁 ${pr.weeks} 週免費</em>` : ''}</span>` : ''}</button>`;
-  }).join('');
-  if (!list.length) h += '<p class="empty">還沒有保單，按右上角「＋ 新增保單」。</p>';
+  };
+  h += list.map(card).join('');
+  if (!all.length) h += '<p class="empty">還沒有保單，按右上角「＋ 新增保單」。</p>';
+  else if (!list.length) h += '<p class="empty">目前沒有有效的保單。</p>';
+  if (done.length) h += `<div class="sec">已結束</div><div class="ins-ended">${done.map(card).join('')}</div>`;
   $('#money-ins').innerHTML = h;
   $('#money-ins').querySelectorAll('[data-ins]').forEach(b => b.onclick = () => editIns(INS().find(z => z.id === b.dataset.ins)));
 }
@@ -199,7 +203,7 @@ function editIns(src) {
   const read = () => {            // 把畫面上填的先收起來（新增附約時要重畫）
     if (!$('#i-name')) return;
     Object.assign(v, { name: $('#i-name').value.trim(), company: $('#i-co').value.trim(), insured: $('#i-who').value.trim(),
-      premium: parseFloat($('#i-prem').value) || '', start: $('#i-start').value, note: $('#i-note').value.trim() });
+      premium: parseFloat($('#i-prem').value) || '', start: $('#i-start').value, note: $('#i-note').value.trim(), endDate: $('#i-end') ? $('#i-end').value : (v.endDate || '') });
     v.riders = [...$('#sheet').querySelectorAll('.rider')].map(r => ({ name: r.querySelector('.r-n').value.trim(), premium: parseFloat(r.querySelector('.r-p').value) || '' }));
     Object.assign(v.promo, { months: parseFloat($('#i-pm').value) || '', points: parseFloat($('#i-pp').value) || '', prog: $('#i-pg').value,
       weeks: parseFloat($('#i-pw').value) || '', text: $('#i-pt').value.trim() });
@@ -207,6 +211,9 @@ function editIns(src) {
   const draw = () => {
     const pr = v.promo, due = pr.points && v.start && pr.months ? addMonths(v.start, +pr.months) : '';
     openSheet(`<div class="shead"><button class="txt" id="i-cancel">取消</button><b>${isNew ? '新增保單' : '修改保單'}</b><button class="txt strong" id="i-save">儲存</button></div>
+      <div class="fsec">保單狀態</div>
+      <div class="seg seg2" id="i-state"><button type="button" data-e="0" class="${v.ended ? '' : 'on'}">✅ 有效中</button><button type="button" data-e="1" class="${v.ended ? 'on' : ''}">⏹ 已結束</button></div>
+      ${v.ended ? `<label>結束日期 <span class="opt-tag">可不填</span></label><input id="i-end" type="date" value="${v.endDate || ''}"><p class="hint">已結束的保單不算進每年保費合計，會放在保險頁最下面。</p>` : ''}
       <div class="fsec">基本資料</div>
       <label>保單名字</label><input id="i-name" value="${esc(v.name)}" placeholder="例如：醫療險、車險">
       <label>保險公司</label><input id="i-co" value="${esc(v.company)}" placeholder="例如：Bupa、NRMA">
@@ -232,6 +239,7 @@ function editIns(src) {
     $('#i-freq').onclick = e => { const b = e.target.closest('button'); if (!b) return; v.freq = b.dataset.f;
       $('#i-freq').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); };
     $('#i-addr').onclick = () => { read(); v.riders.push({ name: '', premium: '' }); draw(); };
+    $('#i-state').onclick = e => { const b = e.target.closest('button'); if (!b) return; read(); v.ended = b.dataset.e === '1'; if (v.ended && !v.endDate) v.endDate = ymd(new Date()); draw(); };
     $('#sheet').oninput = e => { if (e.target.id === 'i-prem' || e.target.classList.contains('r-p')) { read(); $('#i-total').textContent = money(insPer(v)); } };
     $('#sheet').querySelectorAll('.r-x').forEach(b => b.onclick = () => { read(); v.riders.splice(+b.dataset.n, 1); draw(); });
     ['#i-pm', '#i-pp', '#i-pg', '#i-start'].forEach(s => $(s).onchange = () => { read(); draw(); });
