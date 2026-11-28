@@ -287,8 +287,11 @@ function renderSet() {
     <div class="sec">其他</div>
     <div class="list"><button class="lrow" id="set-shop"><span class="ci">🏪</span><span class="lv big">商店<small>${SHOPS().length} 家・記一筆時可以選</small></span><span class="chev">›</span></button>
       <button class="lrow" id="set-me"><span class="ci">📱</span><span class="lv big">這支手機是誰的<small>${getMe() ? (getMe() === 'ben' ? 'Ben' : 'Sarah') : '還沒設定'}</small></span><span class="chev">›</span></button></div>
+    <div class="sec">備份</div>
+    <div class="list"><button class="lrow" id="set-bk"><span class="ci">💾</span><span class="lv big">匯出／匯入備份檔<small>${bkGet(BK.app + '-lastbackup') ? '上次匯出：' + bkDate(bkGet(BK.app + '-lastbackup')) : '還沒匯出過・換手機前一定要做'}</small></span><span class="chev">›</span></button></div>
     <p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。資料只存在這支手機。</p>`;
   $('#set-acct').onclick = () => openAccount(null);
+  $('#set-bk').onclick = () => openBackup(() => { closeSheet(); renderSet(); });
   $('#set-shop').onclick = () => manageStores();
   $('#set-me').onclick = () => askMe(() => { closeSheet(); renderSet(); });
   $('#set-csv').onclick = () => $('#csv-file').click();
@@ -560,4 +563,77 @@ function editStore(s) {
     s.name = v; save(); toast('已儲存'); manageStores(); };
   $('#st-del').onclick = () => { $('#st-del').outerHTML = '<button class="danger" id="st-del2">確定刪除</button>';
     $('#st-del2').onclick = () => { db.stores = SHOPS().filter(z => z !== s); save(); toast('已刪除'); manageStores(); }; };
+}
+
+// ====================================================================
+// 備份檔（2026-11-28 加；錢包 v2.9／行事曆 v0.34／朋友版 v1.5 共用同一段，只有 BK 那行不一樣）
+//  匯出：做成 .json 檔 → iPhone 跳出分享選單 →「儲存到檔案」（iCloud 雲碟）
+//  匯入：選備份檔 → 取代這支手機上的資料（不合併）。匯入前的資料自動留一份在 <app>-before-import，可以「救回」
+// ====================================================================
+const BK = { app: 'our-wallet', name: '我們的錢包', get keys() { return [Store.KEY]; }, hint: '兩支手機的資料是分開的，要各自備份。',
+  summary: d => { const w = d[Store.KEY] || {}; return `${(w.accounts || []).length} 個帳戶、${(w.expenses || []).length} 筆紀錄、${(w.ins || []).length} 張保單`; } };
+const bkGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const bkSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
+const bkDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+function bkCollect() {
+  const data = {};
+  BK.keys.forEach(k => { const v = bkGet(k); if (v != null) { try { data[k] = JSON.parse(v); } catch (e) { } } });
+  return data;
+}
+let bkBack = null;
+function openBackup(back) {
+  if (typeof back === 'function') bkBack = back; else if (back !== undefined) bkBack = null;
+  const last = bkGet(BK.app + '-lastbackup'), undo = bkGet(BK.app + '-before-import');
+  let undoAt = ''; try { undoAt = undo ? JSON.parse(undo).exported : ''; } catch (e) { }
+  openSheet(`<h3>💾 備份</h3>
+    <p class="hint bk-hint">資料只存在這支手機，換手機、刪掉 App 就會不見。建議每個月匯出一次，存到「檔案」App（iCloud 雲碟）。換手機時，在新手機打開這個 App →「匯入備份檔」。${BK.hint || ''}</p>
+    <div class="btns bkbtns">
+      <button class="primary" id="bk-out">📤 匯出備份檔<small>${last ? '上次匯出：' + bkDate(last) : '還沒匯出過'}</small></button>
+      <button id="bk-in">📥 匯入備份檔<small>會取代這支手機上現在的資料</small></button>
+      ${undo ? `<button id="bk-undo">↩️ 救回匯入前的資料<small>${undoAt ? bkDate(undoAt) + ' 那時候的資料' : ''}</small></button>` : ''}
+      <button id="bk-close">${bkBack ? '‹ 返回' : '關閉'}</button>
+    </div>`);
+  $('#bk-close').onclick = () => bkBack ? bkBack() : closeSheet();
+  $('#bk-out').onclick = exportBackup;
+  $('#bk-in').onclick = () => {
+    const i = document.createElement('input'); i.type = 'file';      // 不限制副檔名：iPhone 有時會把 .json 變灰選不到
+    i.onchange = () => { const f = i.files && i.files[0]; if (f) f.text().then(t => askImport(t, false)); };
+    i.click();
+  };
+  if (undo) $('#bk-undo').onclick = () => { let j = null; try { j = JSON.parse(undo); } catch (e) { } if (j) askImport(j, true); else toast('救不回來，資料壞掉了'); };
+}
+async function exportBackup() {
+  const now = new Date(), out = { app: BK.app, name: BK.name, format: 1, exported: now.toISOString(), data: bkCollect() };
+  const fname = `${BK.name}備份_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.json`;
+  const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+  let shared = false;
+  try {
+    const f = new File([blob], fname, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f] }); shared = true; }
+  } catch (e) { if (e && e.name === 'AbortError') { toast('沒有匯出'); return; } }
+  if (!shared) {                                    // 電腦或不支援分享 → 直接下載
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  bkSet(BK.app + '-lastbackup', now.toISOString());
+  toast('備份檔做好了'); openBackup();
+}
+function askImport(src, isUndo) {
+  let j = src;
+  if (typeof src === 'string') { try { j = JSON.parse(src); } catch (e) { toast('看不懂這個檔案'); return; } }
+  if (!j || j.app !== BK.app || !j.data || typeof j.data !== 'object') { toast(`這不是「${BK.name}」的備份檔`); return; }
+  let sum = ''; try { sum = BK.summary(j.data); } catch (e) { }
+  openSheet(`<h3>${isUndo ? '↩️ 救回匯入前的資料' : '📥 匯入備份檔'}</h3>
+    <p class="bk-info">${j.exported ? `${isUndo ? '資料時間' : '備份時間'}：<b>${bkDate(j.exported)}</b><br>` : ''}${esc(sum)}</p>
+    <p class="hint">這支手機上現在的資料會被<b>取代</b>（不會合併）。現在的資料會先自動留一份，之後可以在「備份」救回來。</p>
+    <div class="btns"><button class="primary" id="bk-ok">確定${isUndo ? '救回' : '匯入'}</button><button id="bk-no">‹ 返回</button></div>`);
+  $('#bk-no').onclick = () => openBackup();
+  $('#bk-ok').onclick = () => {
+    bkSet(BK.app + '-before-import', JSON.stringify({ app: BK.app, name: BK.name, format: 1, exported: new Date().toISOString(), data: bkCollect() }));
+    let ok = true;
+    BK.keys.forEach(k => { if (k in j.data) ok = bkSet(k, JSON.stringify(j.data[k])) && ok; });
+    if (!ok) { toast('匯入失敗：手機空間不夠'); return; }
+    window.__bkReloading = true;
+    toast(isUndo ? '救回來了' : '匯入好了'); setTimeout(() => location.reload(), 400);
+  };
 }
