@@ -620,7 +620,7 @@ function startPets() {
   const pets = ['pet-cat', 'pet-dog'].map((id, i) => {
     const el = document.getElementById(id); if (!el) return null;
     const [x, y] = i ? [230, 160] : [150, 150];
-    return { el, x, y, tx: x, ty: y, wait: 500 + i * 900, speed: i ? 22 : 14, dir: 1, size: i ? 1.1 : 1.3 };
+    return { el, x, y, tx: x, ty: y, wait: 500 + i * 900, speed: i ? 22 : 14, dir: 1, size: i ? 1.1 : 0.95 };
   }).filter(Boolean);
   let last = performance.now();
   const step = now => {
@@ -678,30 +678,9 @@ function renderIsland(net) {
       <path d="M-7 -10 Q-5 -12 -2 -12 L2 -12 L2 -4 L-11 -4Z M5 -12 L9 -12 Q12 -12 14 -9 L16 -4 L5 -4Z" fill="#DDEFFB"/>
       <rect x="-22" y="2" width="5" height="3" rx="1.5" fill="#FBD98A"/><circle cx="-12" cy="11" r="5" fill="#3E3236"/><circle cx="13" cy="11" r="5" fill="#3E3236"/>
       <circle cx="-12" cy="11" r="2" fill="#C9C9C9"/><circle cx="13" cy="11" r="2" fill="#C9C9C9"/></g>
-    <g class="person" transform="translate(140,172)"><g class="bob b1">
-      <ellipse cx="0" cy="0" rx="9" ry="2.5" fill="#000" opacity=".12"/>
-      <rect x="-5" y="-12" width="4" height="12" rx="2" fill="#5A4048"/><rect x="1" y="-12" width="4" height="12" rx="2" fill="#5A4048"/>
-      <path d="M-9 -12 Q-9 -26 0 -26 Q9 -26 9 -12Z" fill="#9A93DE"/>
-      <image href="icons/boy.svg" x="-14" y="-50" width="28" height="28"/></g></g>
-    <g class="person" transform="translate(168,178)"><g class="bob b2">
-      <ellipse cx="0" cy="0" rx="9" ry="2.5" fill="#000" opacity=".12"/>
-      <rect x="-4.5" y="-10" width="3.5" height="10" rx="1.75" fill="#F2D4BF"/><rect x="1" y="-10" width="3.5" height="10" rx="1.75" fill="#F2D4BF"/>
-      <path d="M-10 -9 Q-7 -26 0 -26 Q7 -26 10 -9Z" fill="#9CC76E"/>
-      <image href="icons/girl.svg" x="-14" y="-50" width="28" height="28"/></g></g>
-    <g id="pet-cat" class="pet"><g class="flip"><g class="walk">
-      <ellipse cx="0" cy="0" rx="11" ry="2.5" fill="#000" opacity=".12"/>
-      <path d="M-10 -9 Q-20 -12 -18 -22 Q-17 -26 -14 -24" stroke="#6B4C3B" stroke-width="4.5" fill="none" stroke-linecap="round"/>
-      <rect class="leg l1" x="-8" y="-6" width="3.5" height="6" rx="1.7" fill="#6B4C3B"/><rect class="leg l2" x="4" y="-6" width="3.5" height="6" rx="1.7" fill="#6B4C3B"/>
-      <ellipse cx="-1" cy="-9" rx="12" ry="6.5" fill="#F6EEE2"/><ellipse cx="-3" cy="-6" rx="7" ry="3" fill="#FFFFFF"/>
-      <ellipse cx="10" cy="-9.5" rx="6.5" ry="3.8" fill="#FFFFFF"/>
-      <path d="M4.5 -21 L6.5 -31 L12 -24Z M14 -24 L19.5 -31 L20.5 -21Z" fill="#7A5A48"/>
-      <path d="M6.6 -23.4 L7.5 -28.4 L10.4 -24.4Z M15.6 -24.4 L18.5 -28.4 L19 -23.4Z" fill="#E8B8B8"/>
-      <circle cx="12.5" cy="-17" r="9" fill="#F7F0E6"/>
-      <ellipse cx="12.5" cy="-15.6" rx="7.2" ry="6.2" fill="url(#ragmask)"/>
-      <ellipse cx="9.4" cy="-17.6" rx="2.1" ry="2.5" fill="#4F8FD0"/><ellipse cx="15.6" cy="-17.6" rx="2.1" ry="2.5" fill="#4F8FD0"/>
-      <circle cx="10" cy="-18.5" r=".8" fill="#fff"/><circle cx="16.2" cy="-18.5" r=".8" fill="#fff"/>
-      <path d="M11.6 -14.4 h1.8 l-.9 1.1z" fill="#E79AA8"/>
-      <path d="M12.5 -13.3 q-1 1.2 -2 .4 M12.5 -13.3 q1 1.2 2 .4" stroke="#4A3A3F" stroke-width=".6" fill="none" stroke-linecap="round"/></g></g></g>
+    <g class="person" transform="translate(140,172)"><g class="bob b1">${charBen()}</g></g>
+    <g class="person" transform="translate(168,178)"><g class="bob b2">${charSarah()}</g></g>
+    <g id="pet-cat" class="pet"><g class="flip"><g class="walk">${charCat('isl-catmask')}</g></g></g>
     <g id="pet-dog" class="pet"><g class="flip"><g class="walk">
       <ellipse cx="0" cy="0" rx="13" ry="2.8" fill="#000" opacity=".12"/>
       <path d="M-12 -12 Q-20 -10 -21 -3" stroke="#2E2A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
