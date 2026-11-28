@@ -19,7 +19,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const Store = {
   KEY: 'our-wallet-v1',
   load() { try { return JSON.parse(localStorage.getItem(this.KEY)); } catch (e) { return null; } },
-  save(d) { try { localStorage.setItem(this.KEY, JSON.stringify(d)); } catch (e) { toast('存檔失敗'); } }
+  save(d) { if (window.__bkReloading) return; try { localStorage.setItem(this.KEY, JSON.stringify(d)); } catch (e) { toast('存檔失敗'); } }
 };
 let db = Store.load() || { expenses: [], accounts: [], cats: [] };
 if (!db.expenses) db.expenses = [];
@@ -391,7 +391,6 @@ function editAccount(a, back, draft) {
   let type = v.type;
   const bank = '__other';                     // v2.7 帳戶名稱改回自己打（不用清單）
   let pm = v.payMode === 'day' || (!v.payMode && v.payDay) ? 'day' : 'free';
-  const FREE = [44, 45, 50, 55, 62];
   openSheet(`
     <div class="shead"><button class="txt" id="a-cancel">${back ? '‹ 返回' : '取消'}</button><b>${isNew ? '新增帳戶' : '修改帳戶'}</b><button class="txt strong" id="a-save">儲存</button></div>
     <label>種類</label>
@@ -404,8 +403,7 @@ function editAccount(a, back, draft) {
       <input id="a-sd" type="number" inputmode="numeric" min="1" max="28" value="${v.statementDay || ''}" placeholder="例如：18">
       <label>繳費日怎麼算</label>
       <div class="seg seg2" id="a-pm"><button type="button" data-pm="free" class="${pm === 'free' ? 'on' : ''}">最長免息幾天</button><button type="button" data-pm="day" class="${pm === 'day' ? 'on' : ''}">每月固定幾號</button></div>
-      <div id="a-fdbox"><div class="bankchips" id="a-fds">${FREE.map(n => `<button type="button" data-fd="${n}" class="${+v.freeDays === n ? 'on' : ''}">${n} 天</button>`).join('')}</div>
-        <input id="a-fd" type="number" inputmode="numeric" min="1" max="90" value="${v.freeDays || ''}" placeholder="或自己填，例如：55"></div>
+      <div id="a-fdbox"><div class="fdrow"><input id="a-fd" type="number" inputmode="numeric" min="1" max="90" value="${v.freeDays || ''}" placeholder="例如：55"><span>天</span></div></div>
       <div id="a-pdbox"><input id="a-pd" type="number" inputmode="numeric" min="1" max="31" value="${v.payDay || ''}" placeholder="每月幾號繳，例如：5"></div>
       <p class="hint due-preview" id="a-due"></p>
       <div class="fsec">回饋方案（里程、現金回饋） <button class="txt strong" id="a-addplan" type="button">＋ 新增</button></div>
@@ -420,7 +418,6 @@ function editAccount(a, back, draft) {
   const tmpAcc = () => ({ statementDay: parseInt($('#a-sd').value, 10) || '', payMode: pm, payDay: parseInt($('#a-pd').value, 10) || '', freeDays: parseInt($('#a-fd').value, 10) || '' });
   const paintDue = () => {
     $('#a-fdbox').hidden = pm !== 'free'; $('#a-pdbox').hidden = pm !== 'day';
-    $('#a-fds').querySelectorAll('button').forEach(z => z.classList.toggle('on', +z.dataset.fd === +$('#a-fd').value));
     const t = tmpAcc(), n = nextDue(t);
     $('#a-due').innerHTML = pm === 'free' && !t.statementDay ? '要先填結算日，才算得出繳費日。'
       : n ? `${n.s ? `${mdFmt(n.s)} 結算 → ` : ''}<b>${mdFmt(n.due)} 前要繳</b>。行事曆那天會有「💳 繳費」提醒。` : '';
@@ -436,7 +433,6 @@ function editAccount(a, back, draft) {
     $('#a-type').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
   $('#a-pm').onclick = e => { const b = e.target.closest('button'); if (!b) return; pm = b.dataset.pm;
     $('#a-pm').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paintDue(); };
-  $('#a-fds').onclick = e => { const b = e.target.closest('button'); if (!b) return; $('#a-fd').value = b.dataset.fd; paintDue(); };
   ['#a-sd', '#a-fd', '#a-pd'].forEach(s => $(s).oninput = paintDue);
   $('#a-last4').oninput = () => { $('#a-last4').value = $('#a-last4').value.replace(/\D/g, '').slice(0, 4); };
   $('#a-cancel').onclick = back || closeSheet;
