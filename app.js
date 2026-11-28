@@ -650,6 +650,7 @@ function walkable(x, y) {
   if (((x - 271) / 48) ** 2 + ((y - 128) / 32) ** 2 < 1) return false;               // 池塘
   if (x > 148 && x < 184 && y > 74 && y < 94) return false;                           // 花草叢
   if (x > 76 && x < 132 && y > 108 && y < 142) return false;                          // 車子
+  if (x > 176 && x < 232 && y > 90 && y < 129) return false;                          // v2.3 健身角（單槓、啞鈴架）
   return true;
 }
 function randomSpot() { for (let i = 0; i < 60; i++) { const x = 50 + Math.random() * 280, y = 60 + Math.random() * 130; if (walkable(x, y)) return [x, y]; } return [190, 170]; }
@@ -662,13 +663,41 @@ function startPets() {         // v2.0：貓、狗、Ben、Sarah 都在島上自
   }).filter(Boolean);
   if (!all.length) return;
   const ben = all.find(p => p.id === 'p-ben'), sarah = all.find(p => p.id === 'p-sarah'), heart = document.getElementById('isl-heart');
+  const cat = all.find(p => p.id === 'pet-cat'), gym = document.getElementById('isl-gym'), lift = document.getElementById('isl-lift'), toy = document.getElementById('isl-toy'), air = document.getElementById('isl-air');
+  const GYM_SPOT = [184, 140];                // Ben 站在啞鈴架前面
+  let act = null, nextAct = performance.now() + 6000 + Math.random() * 6000;     // v2.3：健身、逗貓
+  const popHeart = (x, y) => { if (!heart) return; heart.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)})`); heart.classList.remove('pop'); void heart.getBBox(); heart.classList.add('pop'); };
+  const endAct = () => { if (!act) return; if (act.kind === 'gym') { lift.setAttribute('opacity', 0); lift.classList.remove('on'); gym.classList.remove('busy'); ben.el.classList.remove('lifting'); ben.wait = 600; }
+    if (act.kind === 'cat') { toy.setAttribute('opacity', 0); toy.classList.remove('on'); cat.el.classList.remove('play'); cat.wait = 400; sarah.wait = 800; } act = null; };
   let nextMeet = performance.now() + 9000 + Math.random() * 8000, meeting = null;
   let last = performance.now();
   const step = now => {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!document.body.contains(all[0].el)) return;          // 換頁後就停
     // 互動：其中一個走去找另一個，碰到就面對面、冒愛心
-    if (ben && sarah && !meeting && now > nextMeet) {
+    // v2.3：偶爾 Ben 去健身角舉啞鈴、Sarah 拿逗貓棒找貓玩
+    if (!act && !meeting && now > nextAct && ben && sarah && cat && gym) {
+      if (Math.random() < .5) { act = { kind: 'gym', t0: now }; ben.tx = GYM_SPOT[0]; ben.ty = GYM_SPOT[1]; ben.wait = 0; }
+      else { const side = cat.x > 190 ? -36 : 36;
+        if (walkable(cat.x + side, cat.y + 1)) { act = { kind: 'cat', t0: now }; cat.wait = 99999; sarah.tx = cat.x + side; sarah.ty = cat.y + 1; sarah.wait = 0; } }
+      nextAct = now + 16000 + Math.random() * 14000;
+      if (nextMeet < now + 9000) nextMeet = now + 9000;
+    }
+    if (act) {
+      const p = act.kind === 'gym' ? ben : sarah;
+      if (!act.on && Math.hypot(p.x - p.tx, p.y - p.ty) < 1.2) {
+        act.on = now; p.wait = 99999;
+        if (act.kind === 'gym') { p.dir = 1; gym.classList.add('busy'); ben.el.classList.add('lifting'); lift.classList.add('on'); lift.setAttribute('opacity', 1); }
+        else { p.dir = cat.x > p.x ? 1 : -1; cat.dir = -p.dir; cat.el.classList.add('play'); toy.classList.add('on'); toy.setAttribute('opacity', 1); }
+      }
+      if (act.on) {
+        const t = act.kind === 'gym' ? lift : toy;
+        t.setAttribute('transform', `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);
+        if (act.kind === 'cat') t.firstElementChild.setAttribute('transform', `scale(${p.dir},1)`);
+        if (now - act.on > (act.kind === 'gym' ? 6500 : 5500)) { if (act.kind === 'cat') popHeart((p.x + cat.x) / 2, Math.min(p.y, cat.y) - 52); endAct(); }
+      } else if (now - act.t0 > 14000) endAct();                    // 走太久就算了
+    }
+    if (ben && sarah && !meeting && !act && now > nextMeet) {
       const [a, b] = Math.random() < .5 ? [sarah, ben] : [ben, sarah];
       const side = b.x > 190 ? -16 : 16;
       if (walkable(b.x + side, b.y + 2)) { meeting = { a, b, t0: now }; a.tx = b.x + side; a.ty = b.y + 2; a.wait = 0; b.wait = 99999; }
@@ -687,10 +716,10 @@ function startPets() {         // v2.0：貓、狗、Ben、Sarah 都在島上自
       if (p.wait > 0) { p.wait -= dt * 1000; p.el.classList.remove('moving'); }
       else {
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
-        if (d < 1) { if (!meeting || meeting.a !== p) { [p.tx, p.ty] = randomSpot(); p.wait = (p.person ? 2500 : 800) + Math.random() * 3000; } }
+        if (d < 1) { if ((!meeting || meeting.a !== p) && !(act && !act.on && (act.kind === 'gym' ? ben : sarah) === p)) { [p.tx, p.ty] = randomSpot(); p.wait = (p.person ? 2500 : 800) + Math.random() * 3000; } }
         else {
           const v = Math.min(d, p.speed * dt), nx = p.x + dx / d * v, ny = p.y + dy / d * v;
-          if (walkable(nx, ny) || !walkable(p.x, p.y)) { p.x = nx; p.y = ny; } else { [p.tx, p.ty] = randomSpot(); if (meeting && meeting.a === p) { meeting.b.wait = 500; meeting = null; } }
+          if (walkable(nx, ny) || !walkable(p.x, p.y)) { p.x = nx; p.y = ny; } else { [p.tx, p.ty] = randomSpot(); if (meeting && meeting.a === p) { meeting.b.wait = 500; meeting = null; } if (act && !act.on && (act.kind === 'gym' ? ben : sarah) === p) endAct(); }
           if (Math.abs(dx) > 0.5) p.dir = dx > 0 ? 1 : -1;
           p.el.classList.add('moving');
         }
@@ -700,8 +729,12 @@ function startPets() {         // v2.0：貓、狗、Ben、Sarah 都在島上自
     }
     // 前後順序：越下面的越靠前
     const svg = all[0].el.ownerSVGElement;
-    [...svg.querySelectorAll('.pet,.person,.car')].sort((a, b) => yOf(a) - yOf(b)).forEach(n => svg.appendChild(n));
-    if (heart) svg.appendChild(heart);
+    // 蝴蝶小鳥（#isl-air）不能搬動，搬了 SMIL 動畫會重來 → 其他東西都插在它前面
+    const put = n => air ? svg.insertBefore(n, air) : svg.appendChild(n);
+    [...svg.querySelectorAll('.pet,.person,.car,.prop')].sort((a, b) => yOf(a) - yOf(b)).forEach(put);
+    if (lift && act && act.kind === 'gym') put(lift);
+    if (toy && act && act.kind === 'cat') put(toy);
+    if (heart) put(heart);
     petRaf = requestAnimationFrame(step);
   };
   petRaf = requestAnimationFrame(step);
@@ -767,14 +800,33 @@ function renderIsland(net) {
     <g class="person" id="p-sarah" transform="translate(168,178)"><g class="flip"><g class="bob b2">${charSarah()}</g></g></g>
     <g id="pet-cat" class="pet"><g class="flip"><g class="walk">${charCat('isl-catmask')}</g></g></g>
     <g id="pet-dog" class="pet"><g class="flip"><g class="walk">
-      <ellipse cx="0" cy="0" rx="13" ry="2.8" fill="#000" opacity=".12"/>
-      <path d="M-12 -12 Q-20 -10 -21 -3" stroke="#2E2A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
-      <rect class="leg l1" x="-10" y="-7" width="4" height="7" rx="2" fill="#C98A4B"/><rect class="leg l2" x="5" y="-7" width="4" height="7" rx="2" fill="#C98A4B"/>
-      <ellipse cx="-2" cy="-11" rx="13" ry="6.5" fill="#2E2A2A"/><ellipse cx="7" cy="-9" rx="4" ry="4" fill="#C98A4B"/>
-      <path d="M8 -22 L9 -32 L13 -24Z M14 -24 L18 -33 L19 -23Z" fill="#2E2A2A"/>
-      <ellipse cx="14" cy="-19" rx="7" ry="6.5" fill="#2E2A2A"/><path d="M15 -17 Q22 -17 23 -14 Q20 -12 15 -13Z" fill="#C98A4B"/>
-      <circle cx="22.5" cy="-15" r="1.3" fill="#1A1515"/><circle cx="13" cy="-21" r="1" fill="#C98A4B"/><circle cx="14.5" cy="-20" r="1.2" fill="#fff"/><circle cx="14.7" cy="-20" r=".7" fill="#1A1515"/></g></g></g>
+${charDog()}</g></g></g>
+    <g class="prop gym" id="isl-gym" transform="translate(206,124) scale(1.15)">
+      <ellipse cx="0" cy="1" rx="24" ry="4.5" fill="#000" opacity=".10"/>
+      <rect x="-14" y="-34" width="3" height="34" rx="1.5" fill="#7A8794"/><rect x="11" y="-34" width="3" height="34" rx="1.5" fill="#7A8794"/>
+      <rect x="-17" y="-37" width="34" height="3.4" rx="1.7" fill="#5E6B78"/>
+      <rect x="-17" y="-1.5" width="9" height="2.6" rx="1.3" fill="#5E6B78"/><rect x="8" y="-1.5" width="9" height="2.6" rx="1.3" fill="#5E6B78"/>
+      <g transform="translate(-20,-2)"><rect x="-6" y="-9" width="12" height="2" rx="1" fill="#C9A27A"/><rect x="-5" y="-7" width="1.8" height="7" fill="#B08A64"/><rect x="3.2" y="-7" width="1.8" height="7" fill="#B08A64"/>
+        <g class="rack-db"><rect x="-4.6" y="-12" width="3.2" height="3" rx=".8" fill="#E07A7A"/><rect x="1.4" y="-12" width="3.2" height="3" rx=".8" fill="#E07A7A"/><rect x="-2" y="-11" width="4" height="1" fill="#7A8794"/></g></g>
+      <circle cx="20" cy="-4" r="4.2" fill="#6E9478"/><rect x="18" y="-10" width="4" height="3" rx="1.5" fill="none" stroke="#6E9478" stroke-width="1.4"/></g>
+    <g id="isl-lift" class="isl-act" opacity="0">
+      <g class="db db1"><rect x="-16" y="-16" width="3.6" height="6" rx="1" fill="#E07A7A" stroke="#B85858" stroke-width=".5"/><rect x="-5.6" y="-16" width="3.6" height="6" rx="1" fill="#E07A7A" stroke="#B85858" stroke-width=".5"/><rect x="-12.6" y="-13.8" width="7.2" height="1.6" rx=".8" fill="#6B7783"/></g>
+      <g class="db db2"><rect x="2" y="-16" width="3.6" height="6" rx="1" fill="#E07A7A" stroke="#B85858" stroke-width=".5"/><rect x="12.4" y="-16" width="3.6" height="6" rx="1" fill="#E07A7A" stroke="#B85858" stroke-width=".5"/><rect x="5.4" y="-13.8" width="7.2" height="1.6" rx=".8" fill="#6B7783"/></g>
+      <path class="sweat" d="M-13 -46 q2.4 3.6 0 5.2 q-2.4 -1.6 0 -5.2z" fill="#9FD3F0"/><path class="sweat s2" d="M14 -44 q2 3 0 4.4 q-2 -1.4 0 -4.4z" fill="#9FD3F0"/><text class="flex" x="16" y="-50" font-size="11">💪</text></g>
+    <g id="isl-toy" class="isl-act" opacity="0"><g class="toyflip">
+      <path d="M9 -14 L30 -36" stroke="#B08A64" stroke-width="2" stroke-linecap="round"/>
+      <g class="feather"><animateTransform attributeName="transform" type="rotate" values="-25 30 -36;25 30 -36;-25 30 -36" dur=".9s" repeatCount="indefinite"/><path d="M30 -36 L31 -22" stroke="#8A7A70" stroke-width=".8"/>
+        <path d="M31 -22 q-5 4 -2 12 q5 -4 2 -12z" fill="#F28CA8"/><path d="M31 -22 q5 4 2 12 q-5 -4 -2 -12z" fill="#FBD98A"/><circle cx="31" cy="-22" r="1.8" fill="#C9B6EA"/></g></g></g>
     <g id="isl-heart" class="isl-emote" opacity="0"><path d="M0 0 c-3 -5 -10 -3 -9 3 c1 4 9 9 9 9 s8 -5 9 -9 c1 -6 -6 -8 -9 -3z" fill="#F28CA8" transform="translate(0,-8)"/></g>
+    <g id="isl-air" pointer-events="none">
+      <g class="bfly"><g transform="scale(2)"><ellipse class="w" cx="-2.4" cy="0" rx="2.8" ry="2" fill="#F6B6C8"><animate attributeName="rx" values="2.8;.6;2.8" dur=".32s" repeatCount="indefinite"/></ellipse><ellipse class="w" cx="2.4" cy="0" rx="2.8" ry="2" fill="#F6B6C8"><animate attributeName="rx" values="2.8;.6;2.8" dur=".32s" repeatCount="indefinite"/><animate attributeName="cx" values="2.4;.6;2.4" dur=".32s" repeatCount="indefinite"/></ellipse><ellipse cx="0" cy="0" rx=".7" ry="2.4" fill="#5A4048"/></g>
+        <animateMotion dur="19s" repeatCount="indefinite" path="M90 150 C120 110 170 120 180 100 C195 70 240 90 228 120 C215 150 160 140 140 170 C120 195 70 180 90 150Z"/></g>
+      <g class="bfly"><g transform="scale(2)"><ellipse cx="-2.2" cy="0" rx="2.6" ry="1.9" fill="#FBD98A"><animate attributeName="rx" values="2.6;.5;2.6" dur=".28s" repeatCount="indefinite"/></ellipse><ellipse cx="2.2" cy="0" rx="2.6" ry="1.9" fill="#FBD98A"><animate attributeName="rx" values="2.6;.5;2.6" dur=".28s" repeatCount="indefinite"/><animate attributeName="cx" values="2.2;.5;2.2" dur=".28s" repeatCount="indefinite"/></ellipse><ellipse cx="0" cy="0" rx=".7" ry="2.2" fill="#5A4048"/></g>
+        <animateMotion dur="23s" begin="-9s" repeatCount="indefinite" path="M300 150 C330 130 320 95 290 92 C260 90 250 60 220 75 C190 90 230 130 250 150 C265 168 280 165 300 150Z"/></g>
+      <g class="birds"><g transform="scale(1.6)"><path d="M-5 0 Q-2.5 -3 0 0 Q2.5 -3 5 0" stroke="#5A4048" stroke-width="1.2" fill="none" stroke-linecap="round"><animate attributeName="d" values="M-5 0 Q-2.5 -3 0 0 Q2.5 -3 5 0;M-5 1 Q-2.5 2 0 0 Q2.5 2 5 1;M-5 0 Q-2.5 -3 0 0 Q2.5 -3 5 0" dur=".55s" repeatCount="indefinite"/></path>
+        <path transform="translate(-11,6) scale(.8)" d="M-5 0 Q-2.5 -3 0 0 Q2.5 -3 5 0" stroke="#5A4048" stroke-width="1.3" fill="none" stroke-linecap="round"><animate attributeName="d" values="M-5 1 Q-2.5 2 0 0 Q2.5 2 5 1;M-5 0 Q-2.5 -3 0 0 Q2.5 -3 5 0;M-5 1 Q-2.5 2 0 0 Q2.5 2 5 1" dur=".55s" repeatCount="indefinite"/></path></g>
+        <animateMotion dur="30s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.6;1" calcMode="linear" path="M-30 52 C60 36 120 62 200 44 C270 30 330 50 420 36"/></g>
+    </g>
   </svg>
   <div class="isl-net"><span>我們的淨資產</span><b class="${net >= 0 ? 'pos' : 'neg'}">${money(net)}</b><em class="${status[1]}">${status[0]}</em></div></div>`;
 }
