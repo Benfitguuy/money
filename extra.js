@@ -7,11 +7,32 @@ const FREQ = [['week', '週繳', 52], ['fortnight', '雙週繳', 26], ['month', 
   ['quarter', '季繳', 4], ['half', '半年繳', 2], ['once', '躉繳', 0]];          // 畫面只給前四個選（v1.5 Sarah 指定），後三個是舊資料相容
 const FREQ_SHOW = 4;
 const USES = ['換機票', '升等', '換購物／禮品卡', '轉點', '點數過期'];
-const AIRLINES = ['Qantas Frequent Flyer', 'Virgin Australia Velocity', '長榮航空 無限萬哩遊', '中華航空 華夏會員', 'Singapore KrisFlyer', 'Cathay Asia Miles'];
+const AIRLINES = ['Everyday Rewards', 'Flybuys', 'Qantas Frequent Flyer', 'Virgin Australia Velocity', '長榮航空 無限萬哩遊', '中華航空 華夏會員', 'Singapore KrisFlyer', 'Cathay Asia Miles'];
 const PTS = () => db.points || (db.points = []);
 const INS = () => db.ins || (db.ins = []);
 const progOf = id => PTS().find(p => p.id === id);
-const ptsBal = p => Math.round(((p.init || 0) + (p.log || []).reduce((s, l) => s + l.value, 0)) * 10) / 10;
+// v1.8 消費自動累積：p.rule = { on, rate(每 A$1 幾點), kw, cat, sub, since }；從記帳紀錄算，不另存
+function ruleMatch(rule, x) {
+  if (txType(x) !== 'expense') return false;
+  const text = ((x.merchant || '') + ' ' + (x.note || '')).toLowerCase();
+  if ((rule.kw || '').split(/[,，、]/).map(k => k.trim().toLowerCase()).filter(Boolean).some(k => text.includes(k))) return true;
+  return !!rule.cat && x.cat === rule.cat && (!rule.sub || x.sub === rule.sub);
+}
+const earnOf = (rule, amount) => Math.floor(amount * (rule.rate || 0));
+function autoEarned(p) {
+  const r = p.rule; if (!r || !r.on || !(r.rate > 0)) return { rows: [], total: 0 };
+  const today = ymd(new Date());
+  const rows = db.expenses.filter(x => x.date >= (r.since || '0000') && x.date <= today && ruleMatch(r, x)).map(x => ({ x, pts: earnOf(r, x.amount) }))
+    .sort((a, b) => a.x.date < b.x.date ? 1 : -1);
+  return { rows, total: rows.reduce((t, z) => t + z.pts, 0) };
+}
+const ptsBal = p => Math.round(((p.init || 0) + (p.log || []).reduce((s, l) => s + l.value, 0) + autoEarned(p).total) * 10) / 10;
+function expensePointsHint(f) {          // 記一筆時：這筆會累積哪些點數
+  const amt = parseFloat(f.amount); if (f.type !== 'expense' || !(amt > 0)) return '';
+  const hits = PTS().filter(p => p.rule && p.rule.on && p.rule.rate > 0 && ruleMatch(p.rule, { ...f, type: 'expense' }) && f.date >= (p.rule.since || '0000'))
+    .map(p => `${esc(p.airline)} +${num1(earnOf(p.rule, amt))} 點`);
+  return hits.length ? '🎯 這筆會累積：' + hits.join('、') : '';
+}
 const pts = n => num1(n) + ' 點';
 const freqName = k => (FREQ.find(f => f[0] === k) || FREQ[2])[1];
 const insPer = i => (i.premium || 0) + (i.riders || []).reduce((s, r) => s + (r.premium || 0), 0);   // 每期保費＝主約＋附約
@@ -28,24 +49,29 @@ function syncPointLog(key, val, progId, entry) {   // key: ['reb', id] 或 ['ins
 }
 
 // ---------- 航空點數頁 ----------
+let ptsTab = 'prog';
 function renderPts() {
+  const seg = `<div class="mtabs ptabs"><button data-pt="prog" class="${ptsTab === 'prog' ? 'on' : ''}">✈️ 點數</button><button data-pt="promo" class="${ptsTab === 'promo' ? 'on' : ''}">🛒 超市活動</button></div>`;
+  $('#money-new').textContent = ptsTab === 'promo' ? '＋ 新增活動' : '＋ 新增點數帳戶';
+  if (ptsTab === 'promo') { renderPromos(seg); bindPtTabs(); return; }
   const list = PTS();
   let h = list.map(p => {
     const last = (p.log || []).slice().sort((a, b) => a.date < b.date ? 1 : -1)[0];
-    return `<button class="pcard" data-prog="${p.id}"><span class="pc-top"><span class="pc-ic">✈️</span><span class="pc-n">${esc(p.airline)}${p.member ? `<small>會員 ${esc(p.member)}</small>` : ''}</span><span class="chev">›</span></span>
+    return `<button class="pcard" data-prog="${p.id}"><span class="pc-top"><span class="pc-ic">${/rewards|flybuys|超市|woolworths|coles/i.test(p.airline) ? '🛒' : '✈️'}</span><span class="pc-n">${esc(p.airline)}${p.member ? `<small>會員 ${esc(p.member)}</small>` : ''}</span><span class="chev">›</span></span>
       <b class="pc-bal">${num1(ptsBal(p))}<small> 點</small></b>
-      <small class="pc-last">${last ? `最近：${last.date}　${last.value > 0 ? '+' : ''}${num1(last.value)}　${esc(srcName(last))}` : '還沒有紀錄'}</small></button>`;
+      ${p.rule && p.rule.on ? `<small class="pc-last">🎯 消費自動累積 ${num1(autoEarned(p).total)} 點</small>` : ''}<small class="pc-last">${last ? `最近：${last.date}　${last.value > 0 ? '+' : ''}${num1(last.value)}　${esc(srcName(last))}` : '還沒有紀錄'}</small></button>`;
   }).join('');
-  if (!list.length) h = '<div class="card"><p class="empty" style="margin:0">還沒有航空點數。按右上角「＋ 新增航空公司」，輸入現在有幾點就好。<br>信用卡的里程回饋、保險活動送的點數，都可以直接存進來。</p></div>';
+  if (!list.length) h = '<div class="card"><p class="empty" style="margin:0">還沒有點數帳戶。按右上角「＋ 新增點數帳戶」，輸入現在有幾點就好。<br>信用卡的里程回饋、保險活動送的點數，都可以直接存進來。</p></div>';
   const uses = list.flatMap(p => (p.log || []).filter(l => l.value < 0).map(l => ({ p, l }))).sort((a, b) => a.l.date < b.l.date ? 1 : -1);
   if (list.length) h += `<div class="sec acc-sec"><span>使用紀錄</span><button class="txt strong" id="use-add">－ 記一筆使用</button></div>
     <div class="list">${uses.length ? uses.map(({ p, l }) => `<button class="lrow" data-use="${p.id}|${l.id}"><span class="lv big">${esc(l.use || l.note || '使用點數')}<small>${l.date}・${esc(p.airline)}${l.use && l.note ? '・' + esc(l.note) : ''}</small></span><b class="neg">${num1(l.value)}</b><span class="chev">›</span></button>`).join('')
       : '<p class="empty" style="padding:10px 12px">換機票、升等、兌換用掉的點數記在這裡。</p>'}</div>`;
-  $('#money-pts').innerHTML = h;
+  $('#money-pts').innerHTML = seg + h; bindPtTabs();
   if ($('#use-add')) $('#use-add').onclick = () => list.length === 1 ? editLog(list[0], null, -1, true) : pickProg(p => editLog(p, null, -1, true));
   $('#money-pts').querySelectorAll('[data-use]').forEach(b => b.onclick = () => { const [pid, lid] = b.dataset.use.split('|'); const p = progOf(pid); editLog(p, p.log.find(z => z.id === lid), -1, true); });
   $('#money-pts').querySelectorAll('[data-prog]').forEach(b => b.onclick = () => openProg(progOf(b.dataset.prog)));
 }
+function bindPtTabs() { $('#money-pts').querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { ptsTab = b.dataset.pt; renderPts(); }); }
 function pickProg(done) {
   openSheet(`<div class="shead"><button class="txt" id="pp-back">取消</button><b>用哪一家的點數？</b><span></span></div>
     <div class="list">${PTS().map(p => `<button class="lrow" data-id="${p.id}"><span class="lv big">${esc(p.airline)}</span><small class="muted">${pts(ptsBal(p))}</small></button>`).join('')}</div>`);
@@ -55,6 +81,7 @@ function pickProg(done) {
 function srcName(l) {
   if (l.src === 'card') { const a = db.accounts.find(z => (z.rebates || []).some(r => r.id === l.reb)); return (a ? a.name + ' ' : '') + '信用卡回饋' + (l.note ? '・' + l.note : ''); }
   if (l.src === 'ins') { const i = INS().find(z => z.id === l.ins); return '保險活動' + (i ? '・' + i.name : ''); }
+  if (l.src === 'promo') { const pr = PROMOS().find(z => z.id === l.promo); return '超市活動' + (pr ? '・' + pr.title : ''); }
   if (l.value < 0) return l.use || l.note || '使用點數';
   return l.note || '手動加點';
 }
@@ -66,8 +93,12 @@ function openProg(p) {
     <div class="card"><div class="mbal" style="border:0;margin:0;padding:0"><span>目前點數</span><b class="pos">${pts(ptsBal(p))}</b></div>
       ${p.member ? `<p class="hint">會員編號 ${esc(p.member)}</p>` : ''}
       <div class="row2" style="margin-top:10px"><button class="pill2" id="p-earn">＋ 賺到點數</button><button class="pill2" id="p-use">－ 使用點數</button></div></div>
-    <div class="sec acc-sec"><span>使用紀錄（已用 ${num1(-used.reduce((s, l) => s + l.value, 0))} 點）</span></div>
+    <div class="sec acc-sec"><span>使用紀錄（已用 ${num1(Math.abs(used.reduce((s, l) => s + l.value, 0)))} 點）</span></div>
     <div class="list">${used.length ? used.map(row).join('') : '<p class="empty" style="padding:10px 12px">換機票、升等等用掉的點數記在這裡。</p>'}</div>
+    ${(() => { const a = autoEarned(p); if (!p.rule || !p.rule.on) return ''; const mon = ymd(new Date()).slice(0, 7), m = a.rows.filter(z => z.x.date.slice(0, 7) === mon);
+      return `<div class="sec acc-sec"><span>🎯 消費自動累積（共 ${num1(a.total)} 點・本月 ${num1(m.reduce((t, z) => t + z.pts, 0))} 點）</span></div>
+      <div class="list">${a.rows.length ? a.rows.slice(0, 30).map(z => `<div class="lrow"><span class="lv big">${esc(z.x.merchant || catInfo(z.x.cat).name)}<small>${z.x.date}・消費 ${money(z.x.amount)}</small></span><b class="pos">+${num1(z.pts)}</b></div>`).join('')
+        : `<p class="empty" style="padding:10px 12px">${p.rule.since} 之後還沒有符合的消費。記帳時商家寫「${esc((p.rule.kw || '').split(/[,，]/)[0] || '…')}」就會算進來。</p>`}</div>`; })()}
     <div class="sec acc-sec"><span>累積紀錄</span></div>
     <div class="list">${earn.length ? earn.map(row).join('') : '<p class="empty" style="padding:10px 12px">賺到的點數記在這裡。信用卡回饋和保險活動存進來的也會出現。</p>'}</div>
     <p class="hint">從信用卡或保險存進來的紀錄，要到那張卡或那張保單裡修改。</p>`);
@@ -79,20 +110,31 @@ function openProg(p) {
 }
 function editProg(p) {
   const isNew = !p, v = p || { airline: '', member: '' };
-  openSheet(`<div class="shead"><button class="txt" id="e-cancel">取消</button><b>${isNew ? '新增航空公司' : '修改'}</b><button class="txt strong" id="e-save">儲存</button></div>
-    <label>航空公司／會員計畫</label><input id="e-air" list="e-airs" value="${esc(v.airline)}" placeholder="例如：Qantas Frequent Flyer">
+  openSheet(`<div class="shead"><button class="txt" id="e-cancel">取消</button><b>${isNew ? '新增點數帳戶' : '修改'}</b><button class="txt strong" id="e-save">儲存</button></div>
+    <label>航空公司／會員計畫（超市點數像 Everyday Rewards、Flybuys 也可以）</label><input id="e-air" list="e-airs" value="${esc(v.airline)}" placeholder="例如：Qantas Frequent Flyer">
     <datalist id="e-airs">${AIRLINES.map(a => `<option value="${esc(a)}">`).join('')}</datalist>
     <label>現在有幾點</label><input id="e-bal" type="number" inputmode="decimal" step="any" value="${isNew ? '' : ptsBal(p)}" class="big" placeholder="0">
     <label>會員編號（可不填，只記末幾碼也行）</label><input id="e-mem" value="${esc(v.member || '')}">
+    <div class="fsec">從消費自動累積點數</div>
+    <label class="check"><input type="checkbox" id="e-on"${v.rule && v.rule.on ? ' checked' : ''}> 記帳時自動算點數（例如 Everyday Rewards 每 A$1 得 1 點）</label>
+    <div id="e-rule">
+      <div class="inl"><span>每花 A$1 得</span><input id="e-rate" type="number" inputmode="decimal" step="any" value="${(v.rule && v.rule.rate) || 1}"><span>點</span></div>
+      <label>商家或備註包含（用逗號分開）</label><input id="e-kw" value="${esc((v.rule && v.rule.kw) || '')}" placeholder="例如：Woolworths, Woolies, BIG W">
+      <label>或是這個分類</label><select id="e-cat">${ruleCatOpts(v.rule || {})}</select>
+      <label>從哪一天開始算</label><input id="e-since" type="date" value="${(v.rule && v.rule.since) || ymd(new Date())}">
+      <p class="hint">記帳時商家寫對，點數就會自動加上（每筆照金額無條件捨去）。只是估算，實際以會員 App 為準。</p></div>
     <p class="hint">改「現在有幾點」不會動到下面的紀錄，只會把起始點數調整到對。</p>
     <p class="err" id="e-err"></p>
     ${isNew ? '' : '<div class="btns"><button class="danger" id="e-del">刪除這個航空公司</button></div>'}`);
+  const paintRule = () => $('#e-rule').hidden = !$('#e-on').checked; paintRule(); $('#e-on').onchange = paintRule;
   $('#e-cancel').onclick = () => isNew ? (closeSheet(), renderMoney()) : openProg(p);
   $('#e-save').onclick = () => {
     const airline = $('#e-air').value.trim(), bal = parseFloat($('#e-bal').value) || 0;
-    if (!airline) return $('#e-err').textContent = '請寫航空公司';
+    if (!airline) return $('#e-err').textContent = '請寫名稱';
     const prog = p || { id: uid(), init: 0, log: [] };
     prog.airline = airline; prog.member = $('#e-mem').value.trim();
+    const [rc, rs] = $('#e-cat').value.split('|');
+    prog.rule = { on: $('#e-on').checked, rate: parseFloat($('#e-rate').value) || 0, kw: $('#e-kw').value.trim(), cat: rc || '', sub: rs || '', since: $('#e-since').value || ymd(new Date()) };
     prog.init = Math.round((bal - (ptsBal(prog) - (prog.init || 0))) * 10) / 10;
     if (isNew) PTS().push(prog);
     save(); toast('已儲存'); openProg(prog);
@@ -104,6 +146,8 @@ function editProg(p) {
     save(); closeSheet(); renderMoney(); toast('已刪除');
   };
 }
+const ruleCatOpts = r => `<option value="">不用分類比對</option>` + catsOf('expense').map(c => `<option value="${c.k}|"${r.cat === c.k && !r.sub ? ' selected' : ''}>${esc(c.icon + ' ' + c.name)}</option>` +
+  c.subs.map(sb => `<option value="${c.k}|${sb.k}"${r.cat === c.k && r.sub === sb.k ? ' selected' : ''}>　${esc(c.name)} › ${esc(sb.name)}</option>`).join('')).join('');
 function confirmDel(msg) { const b = $('#sheet .danger'); if (b && b.dataset.sure) return true; if (b) { b.dataset.sure = 1; b.textContent = '再按一次確定刪除'; } toast(msg); return false; }
 function editLog(p, l, sign0 = 1, fromList = false) {
   const isNew = !l, v = l || { value: '', date: ymd(new Date()), note: '', use: '' };
@@ -238,16 +282,29 @@ function manageCats(kind) {
   const list = catsOf(kind);
   openSheet(`<div class="shead"><button class="txt" id="m-close">完成</button><b>${kind === 'income' ? '收入' : '消費'}分類</b><button class="txt strong" id="m-add">＋ 新增</button></div>
     <div class="list">${list.map((c, n) => `<div class="lrow catm"><button class="cm-main" data-k="${c.k}">${catIcon(c.k)}<span class="lv big">${esc(c.name)}<small>${c.subs.length ? c.subs.length + ' 個子項目・' : ''}${used(c.k)} 筆</small></span></button>
-      <span class="cm-mv"><button data-up="${c.k}" ${n ? '' : 'disabled'} aria-label="往上">▲</button><button data-dn="${c.k}" ${n < list.length - 1 ? '' : 'disabled'} aria-label="往下">▼</button></span></div>`).join('')}</div>
-    <p class="hint">點分類可以改名字、圖示、顏色、子項目。用 ▲▼ 排順序（記一筆時照這個順序）。</p>`);
+      <span class="cm-grip" aria-hidden="true">≡</span></div>`).join('')}</div>
+    <p class="hint">點分類可以改名字、圖示、顏色、子項目。<b>久按一下再上下拖</b>可以排順序（記一筆時照這個順序）。</p>`);
   $('#m-close').onclick = () => { closeSheet(); renderMoney(); };
   $('#m-add').onclick = () => editCat(kind, null);
-  $('#sheet').querySelectorAll('.cm-main').forEach(b => b.onclick = () => editCat(kind, catInfo(b.dataset.k)));
-  const move = (k, d) => { const all = db.cats, i = all.findIndex(c => c.k === k);
-    let j = i + d; while (j >= 0 && j < all.length && all[j].kind !== kind) j += d;
-    if (j < 0 || j >= all.length) return; [all[i], all[j]] = [all[j], all[i]]; save(); manageCats(kind); };
-  $('#sheet').querySelectorAll('[data-up]').forEach(b => b.onclick = () => move(b.dataset.up, -1));
-  $('#sheet').querySelectorAll('[data-dn]').forEach(b => b.onclick = () => move(b.dataset.dn, 1));
+  let justDragged = 0;
+  $('#sheet').querySelectorAll('.cm-main').forEach(b => b.onclick = () => { if (Date.now() < justDragged) return; editCat(kind, catInfo(b.dataset.k)); });
+  // 久按 0.4 秒 → 浮起來 → 上下拖 → 放開存順序（跟行事曆久按移動行程一樣的手勢）
+  const box = $('#sheet .list'); let pend = null, drag = null;
+  const xy = e => e.touches ? e.touches[0] : e;
+  const start = e => { const row = e.target.closest('.catm'); if (!row) return; const p = xy(e);
+    pend = { row, x: p.clientX, y: p.clientY, t: setTimeout(() => { drag = { row }; row.classList.add('lift'); box.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(10); }, 400) }; };
+  const move = e => { if (!pend) return; const p = xy(e);
+    if (!drag) { if (Math.hypot(p.clientX - pend.x, p.clientY - pend.y) > 8) { clearTimeout(pend.t); pend = null; } return; }
+    e.preventDefault();
+    const rows = [...box.querySelectorAll('.catm')], t = rows.find(r => { if (r === drag.row) return false; const b = r.getBoundingClientRect(); return p.clientY > b.top && p.clientY < b.bottom; });
+    if (t) { const b = t.getBoundingClientRect(); box.insertBefore(drag.row, p.clientY < b.top + b.height / 2 ? t : t.nextSibling); } };
+  const end = () => { if (!pend) return; clearTimeout(pend.t); pend = null; if (!drag) return;
+    drag.row.classList.remove('lift'); box.classList.remove('dragging'); drag = null; justDragged = Date.now() + 400;
+    const keys = [...box.querySelectorAll('.cm-main')].map(b => b.dataset.k); let i = 0;
+    db.cats = db.cats.map(c => c.kind === kind ? catInfo(keys[i++]) : c); save(); toast('已排好順序'); };
+  box.addEventListener('touchstart', start, { passive: true }); box.addEventListener('touchmove', move, { passive: false }); box.addEventListener('touchend', end); box.addEventListener('touchcancel', end);
+  box.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  box.addEventListener('contextmenu', e => e.preventDefault());
 }
 function editCat(kind, c) {
   const isNew = !c;
@@ -290,6 +347,139 @@ function editCat(kind, c) {
       db.expenses.forEach(x => { if (x.cat === c.k) { x.cat = to; x.sub = ''; } });
       db.cats = db.cats.filter(z => z !== c); save(); toast('已刪除'); manageCats(kind);
     };
+  };
+  draw();
+}
+
+// ---------- 超市活動（v1.6）：每週都要花滿／期間累積花滿／買指定商品 → 得點數；從記帳紀錄自動算進度 ----------
+//  db.promos：[{ id, title, store, kind: weekly|total|item, start, weeks, target, points, prog, kw, cat, sub, items, done, logId, note }]
+const STORES = ['Woolworths', 'Coles', 'ALDI', 'IGA', 'Costco'];
+const PROMOS = () => db.promos || (db.promos = []);
+const PKIND = { weekly: '每週都要花滿', total: '期間內累積花滿', item: '買指定商品' };
+const daysBetween = (a, b) => Math.round((parseYmd(b) - parseYmd(a)) / 864e5);
+const md = s => { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
+function promoMatch(pr, x) {                       // 這筆消費算不算這個活動的？
+  if (txType(x) !== 'expense') return false;
+  const text = ((x.merchant || '') + ' ' + (x.note || '')).toLowerCase();
+  const kws = (pr.kw || '').split(/[,，、]/).map(k => k.trim().toLowerCase()).filter(Boolean);
+  if (kws.some(k => text.includes(k))) return true;
+  return !!pr.cat && x.cat === pr.cat && (!pr.sub || x.sub === pr.sub);
+}
+function promoStatus(pr) {
+  const today = ymd(new Date()), weeks = Math.max(1, +pr.weeks || 1), end = addDays(pr.start, weeks * 7 - 1);
+  const spentIn = (s, e) => { const rows = db.expenses.filter(x => x.date >= s && x.date <= e && promoMatch(pr, x)); return { rows, sum: rows.reduce((t, x) => t + x.amount, 0) }; };
+  if (pr.kind === 'item') return { end, done: !!pr.done, failed: !pr.done && today > end, weeksInfo: [] };
+  if (pr.kind === 'total') {
+    const { rows, sum } = spentIn(pr.start, end), left = Math.max(0, (pr.target || 0) - sum);
+    return { end, rows, sum, left, done: left <= 0 && sum > 0, failed: left > 0 && today > end, daysLeft: daysBetween(today, end) + 1 };
+  }
+  const weeksInfo = [];
+  for (let w = 0; w < weeks; w++) {
+    const s = addDays(pr.start, w * 7), e = addDays(s, 6), { rows, sum } = spentIn(s, e), left = Math.max(0, (pr.target || 0) - sum);
+    const state = left <= 0 && sum > 0 ? 'done' : today > e ? 'fail' : today >= s ? 'now' : 'later';
+    weeksInfo.push({ n: w + 1, s, e, rows, sum, left, state, daysLeft: daysBetween(today, e) + 1 });
+  }
+  return { end, weeksInfo, done: weeksInfo.every(w => w.state === 'done'), failed: weeksInfo.some(w => w.state === 'fail') };
+}
+function ring(pct, size = 54) {
+  const r = size / 2 - 5, c = 2 * Math.PI * r;
+  return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#E4E8E2" stroke-width="7"/>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="#6E9478" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(c * Math.min(1, pct)).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>`;
+}
+function promoBody(pr, st, detail) {
+  if (pr.kind === 'item') return `<div class="pr-item">${pr.items ? `<p>要買：${esc(pr.items)}</p>` : ''}<p class="hint" style="margin:0">${md(pr.start)}–${md(st.end)}</p>
+    <button class="pill2 pr-check" data-done="${pr.id}">${pr.done ? '✅ 已經買了' : '⬜ 買了就點這裡'}</button></div>`;
+  if (pr.kind === 'total') return `<div class="pr-now">${ring(pr.target ? st.sum / pr.target : 0)}<div><b>${st.done ? '達成了！' : st.failed ? '沒有達成' : money(st.left)}</b>
+    <small>${st.done || st.failed ? `共花 ${money(st.sum)}` : `還差多少（已花 ${money(st.sum)}／${money(pr.target)}）・剩 ${st.daysLeft} 天`}</small></div></div>
+    ${detail ? rowsList(st.rows) : ''}`;
+  return st.weeksInfo.map(w => {
+    const icon = w.state === 'done' ? '<span class="wk ok">✓</span>' : w.state === 'fail' ? '<span class="wk no">✕</span>' : w.state === 'now' ? '<span class="wk wk-now"></span>' : '<span class="wk"></span>';
+    const right = w.state === 'done' ? `完成・花 ${money(w.sum)}` : w.state === 'fail' ? `沒達成・花 ${money(w.sum)}` : w.state === 'now' ? `剩 ${w.daysLeft} 天` : `${md(w.s)} 開始`;
+    const now = w.state === 'now' ? `<div class="pr-now">${ring(pr.target ? w.sum / pr.target : 0)}<div><b>${money(w.left)}</b><small>還差多少（已花 ${money(w.sum)}／${money(pr.target)}）</small></div></div>` : '';
+    return `<div class="wkrow">${icon}<span>第 ${w.n} 週 <small>${md(w.s)}–${md(w.e)}</small></span><em>${right}</em></div>${now}${detail && w.rows.length ? rowsList(w.rows) : ''}`;
+  }).join('');
+}
+const rowsList = rows => rows.length ? `<div class="pr-rows">${rows.map(x => `<div><span>${md(x.date)} ${esc(x.merchant || subName(x.cat, x.sub) || catInfo(x.cat).name)}</span><b>${money(x.amount)}</b></div>`).join('')}</div>` : '';
+function promoCard(pr, detail) {
+  const st = promoStatus(pr);
+  const badge = st.done ? '<em class="tag ok">已達成</em>' : st.failed ? '<em class="tag no">沒達成</em>' : '<em class="tag">進行中</em>';
+  const reward = st.done && pr.points ? (pr.logId ? `<p class="hint">✅ ${num1(pr.points)} 點已存入 ${esc((progOf(pr.prog) || {}).airline || '')}</p>`
+    : `<button class="txt strong pr-save" data-save="${pr.id}">✈️ 把 ${num1(pr.points)} 點存入${progOf(pr.prog) ? ' ' + esc(progOf(pr.prog).airline) : '點數帳戶'}</button>`) : '';
+  return `<div class="pcard prc" data-promo="${pr.id}"><span class="pc-top"><span class="pc-ic">🛒</span><span class="pc-n">${esc(pr.title || '超市活動')}<small>${esc(pr.store || '')}・${PKIND[pr.kind]}${pr.kind !== 'item' ? ' ' + money(pr.target || 0) : ''}${pr.points ? `・得 ${num1(pr.points)} 點` : ''}</small></span>${badge}</span>
+    ${promoBody(pr, st, detail)}${reward}</div>`;
+}
+function renderPromos(seg) {
+  const today = ymd(new Date());
+  const list = PROMOS().slice().sort((a, b) => a.start < b.start ? 1 : -1);
+  const active = list.filter(pr => { const st = promoStatus(pr); return !st.done && !st.failed && today <= st.end; });
+  const past = list.filter(pr => !active.includes(pr));
+  let h = seg + (list.length ? '' : `<div class="card"><p class="empty" style="margin:0">像「連續 4 週每週在 Woolworths 花滿 $120 送 10,000 點」這種活動，按右上角「＋ 新增活動」記下來。<br>
+    App 會從你的記帳紀錄（商家名稱或分類）自動算每週花了多少、還差多少。</p></div>`);
+  if (active.length) h += `<div class="sec">進行中</div>` + active.map(pr => promoCard(pr)).join('');
+  if (past.length) h += `<div class="sec">已結束</div>` + past.map(pr => promoCard(pr)).join('');
+  $('#money-pts').innerHTML = h;
+  bindPromoButtons($('#money-pts'), () => renderPts());
+  $('#money-pts').querySelectorAll('.prc').forEach(b => b.onclick = e => { if (e.target.closest('button')) return; openPromo(PROMOS().find(z => z.id === b.dataset.promo)); });
+}
+function bindPromoButtons(root, redraw) {
+  root.querySelectorAll('[data-done]').forEach(b => b.onclick = () => { const pr = PROMOS().find(z => z.id === b.dataset.done); pr.done = !pr.done; save(); redraw(); });
+  root.querySelectorAll('[data-save]').forEach(b => b.onclick = () => {
+    const pr = PROMOS().find(z => z.id === b.dataset.save);
+    const go = p => { pr.prog = p.id; pr.logId = syncPointLog(['promo', pr.id], pr.points, p.id, { date: ymd(new Date()), src: 'promo', note: pr.title }); save(); toast('已存入點數'); closeSheet(); renderMoney(); };
+    if (progOf(pr.prog)) go(progOf(pr.prog)); else if (PTS().length === 1) go(PTS()[0]); else if (PTS().length) pickProg(go);
+    else toast('先在「點數」新增一個點數帳戶（例如 Everyday Rewards）');
+  });
+}
+function openPromo(pr) {
+  openSheet(`<div class="shead"><button class="txt" id="o-close">關閉</button><b>${esc(pr.title || '超市活動')}</b><button class="txt strong" id="o-edit">編輯</button></div>
+    ${promoCard(pr, true)}
+    <p class="hint">算進來的消費：${pr.kw ? `商家或備註有「${esc(pr.kw)}」` : ''}${pr.kw && pr.cat ? '，或' : ''}${pr.cat ? `分類是「${esc(catInfo(pr.cat).name)}${pr.sub ? '›' + esc(subName(pr.cat, pr.sub)) : ''}」` : ''}${!pr.kw && !pr.cat ? '（還沒設定比對方式）' : ''}。記帳時商家寫對，就會自動算進來。</p>
+    ${pr.note ? `<p class="hint">備註：${esc(pr.note)}</p>` : ''}`);
+  $('#o-close').onclick = () => { closeSheet(); renderMoney(); };
+  $('#o-edit').onclick = () => editPromo(pr);
+  bindPromoButtons($('#sheet'), () => openPromo(pr));
+}
+function editPromo(src) {
+  const isNew = !src;
+  const v = Object.assign({ title: '', store: 'Woolworths', kind: 'weekly', start: ymd(new Date()), weeks: 4, target: '', points: '', prog: '', kw: 'Woolworths, Woolies', cat: '', sub: '', items: '', note: '' }, src || {});
+  const read = () => { if (!$('#r-title')) return;
+    Object.assign(v, { title: $('#r-title').value.trim(), store: $('#r-store').value.trim(), start: $('#r-start').value || v.start, weeks: parseFloat($('#r-weeks').value) || 1,
+      target: parseFloat(($('#r-target') || {}).value) || '', points: parseFloat($('#r-points').value) || '', prog: $('#r-prog').value,
+      kw: ($('#r-kw') || {}).value === undefined ? v.kw : $('#r-kw').value.trim(), items: ($('#r-items') || {}).value === undefined ? v.items : $('#r-items').value.trim(), note: $('#r-note').value.trim() });
+    if ($('#r-cat')) { const [c, sb] = $('#r-cat').value.split('|'); v.cat = c || ''; v.sub = sb || ''; } };
+  const catOpts = () => `<option value="">不用分類比對</option>` + catsOf('expense').map(c => `<option value="${c.k}|"${v.cat === c.k && !v.sub ? ' selected' : ''}>${esc(c.icon + ' ' + c.name)}</option>` +
+    c.subs.map(sb => `<option value="${c.k}|${sb.k}"${v.cat === c.k && v.sub === sb.k ? ' selected' : ''}>　${esc(c.name)} › ${esc(sb.name)}</option>`).join('')).join('');
+  const draw = () => {
+    openSheet(`<div class="shead"><button class="txt" id="r-cancel">取消</button><b>${isNew ? '新增超市活動' : '修改活動'}</b><button class="txt strong" id="r-save">儲存</button></div>
+      <label>活動名稱</label><input id="r-title" value="${esc(v.title)}" placeholder="例如：Boosted 4 週拿 10,000 點">
+      <label>超市</label><input id="r-store" list="r-stores" value="${esc(v.store)}"><datalist id="r-stores">${STORES.map(x => `<option value="${x}">`).join('')}</datalist>
+      <label>活動類型</label><div class="seg seg3" id="r-kind">${Object.entries(PKIND).map(([k, n]) => `<button type="button" data-k="${k}" class="${v.kind === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="row2"><div><label>開始日期</label><input id="r-start" type="date" value="${v.start}"></div><div><label>活動幾週</label><input id="r-weeks" type="number" inputmode="numeric" min="1" value="${v.weeks}"></div></div>
+      ${v.kind === 'item' ? `<label>要買的商品</label><input id="r-items" value="${esc(v.items)}" placeholder="例如：任 2 件 Cadbury 巧克力">`
+        : `<label>${v.kind === 'weekly' ? '每週要花滿（A$）' : '期間內總共要花滿（A$）'}</label><input id="r-target" type="number" inputmode="decimal" step="0.01" value="${v.target}" placeholder="120">`}
+      <div class="row2"><div><label>可得點數</label><input id="r-points" type="number" inputmode="numeric" value="${v.points}" placeholder="10000"></div>
+        <div><label>點數存到</label><select id="r-prog">${progOptions(v.prog, '先不選')}</select></div></div>
+      ${v.kind === 'item' ? '' : `<div class="fsec">從記帳紀錄抓哪些消費</div>
+        <label>商家或備註包含（用逗號分開）</label><input id="r-kw" value="${esc(v.kw)}" placeholder="Woolworths, Woolies">
+        <label>或是這個分類</label><select id="r-cat">${catOpts()}</select>
+        <p class="hint">兩個條件有一個符合就算。例如記帳時商家寫「Woolworths」，或分類選「家用 › 超市」。</p>`}
+      <label>備註</label><input id="r-note" value="${esc(v.note)}" placeholder="例如：要先在 App 按 Boost">
+      <p class="err" id="r-err"></p>${isNew ? '' : '<div class="btns"><button class="danger" id="r-del">刪除這個活動</button></div>'}`);
+    $('#r-kind').onclick = e => { const b = e.target.closest('button'); if (!b) return; read(); v.kind = b.dataset.k; draw(); };
+    $('#r-store').onchange = () => { const old = v.store; read(); if (!v.kw || v.kw.toLowerCase().startsWith((old || '').toLowerCase())) { v.kw = v.store + (v.store === 'Woolworths' ? ', Woolies' : ''); draw(); } };
+    $('#r-cancel').onclick = () => isNew ? (closeSheet(), renderMoney()) : openPromo(src);
+    $('#r-save').onclick = () => {
+      read();
+      if (v.kind !== 'item' && !(v.target > 0)) return $('#r-err').textContent = '請填要花滿多少錢';
+      if (v.kind !== 'item' && !v.kw && !v.cat) return $('#r-err').textContent = '請設定要抓哪些消費（商家關鍵字或分類）';
+      const pr = src || { id: uid(), done: false, logId: '' };
+      Object.assign(pr, v, { title: v.title || `${v.store} ${PKIND[v.kind]}` });
+      if (pr.logId) pr.logId = syncPointLog(['promo', pr.id], pr.points, pr.prog, { date: ymd(new Date()), src: 'promo', note: pr.title });
+      if (isNew) PROMOS().push(pr);
+      save(); toast('已儲存'); isNew ? (closeSheet(), renderMoney()) : openPromo(pr);
+    };
+    if (!isNew) $('#r-del').onclick = () => { if (!confirmDel('刪除活動（存入的點數紀錄也會拿掉），確定嗎？')) return;
+      syncPointLog(['promo', src.id], 0, '', {}); db.promos = PROMOS().filter(z => z !== src); save(); closeSheet(); renderMoney(); toast('已刪除'); };
   };
   draw();
 }
