@@ -497,3 +497,17 @@ body.th-money header{background:var(--bg);-webkit-backdrop-filter:none;backdrop-
 .hello-pig{width:40px;height:33px;vertical-align:-5px;margin-left:4px}
 .hello-pig .coin{animation:coin 2.6s ease-in infinite}
 @keyframes coin{0%{transform:translateY(-4px);opacity:0}20%{opacity:1}55%{transform:translateY(9px);opacity:1}65%,100%{transform:translateY(10px);opacity:0}}
+
+/* v2.3：花不動；天空清澈；健身、逗貓動畫 */
+.ifl{animation:none!important;rotate:none!important}
+body.th-money .island{background:linear-gradient(#BFE2F4 0%,#DCF0F4 42%,#F4FAF6 78%,#FAFAF7 100%)}
+.gym.busy .rack-db{opacity:0}
+#isl-lift.on .db1{animation:curl 1s ease-in-out infinite}
+#isl-lift.on .db2{animation:curl 1s ease-in-out infinite .5s}
+@keyframes curl{0%,100%{translate:0 0}50%{translate:0 -9px}}
+#isl-lift.on .sweat{animation:sweat 1.6s ease-in infinite}#isl-lift.on .s2{animation-delay:.8s}
+@keyframes sweat{0%{opacity:0;translate:0 0}30%{opacity:1}100%{opacity:0;translate:2px 8px}}
+#isl-lift.on .flex{animation:flex 1.3s ease-in-out infinite}
+@keyframes flex{50%{translate:0 -2px}}
+.pet.play .walk{animation:pounce .9s ease-in-out infinite}
+@keyframes pounce{0%,100%{translate:0 0}40%{translate:0 -7px}60%{translate:0 -6px}}
