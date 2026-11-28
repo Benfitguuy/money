@@ -147,12 +147,16 @@ const rebateText = (cash, miles) => [cash ? money(cash) : '', miles ? num1(miles
 // ---------- 畫面 ----------
 function renderMoney() {
   const [y, m] = moneyMonth.split('-').map(Number);
-  $('#money-title').textContent = { acct: '我們的錢包', ins: '保險', pts: '航空點數' }[moneyTab] || `${y}年${m}月`;
+  $('#money-title').textContent = { acct: '我們的錢包', ins: '保險', pts: '航空點數', set: '設定' }[moneyTab] || `${y}年${m}月`;
+  $('#money-add').hidden = moneyTab !== 'acct';                       // v1.5：只有帳戶頁有右上角「記一筆」
+  $('#money-new').hidden = moneyTab !== 'ins' && moneyTab !== 'pts';  // 保險、點數的「新增」放在右上角
+  $('#money-new').textContent = moneyTab === 'ins' ? '＋ 新增保單' : '＋ 新增航空公司';
   document.querySelectorAll('.mntabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === moneyTab));
-  ['list', 'stat', 'acct', 'ins', 'pts'].forEach(t => $('#money-' + t).hidden = t !== moneyTab);
+  ['list', 'stat', 'acct', 'ins', 'pts', 'set'].forEach(t => $('#money-' + t).hidden = t !== moneyTab);
   $('#money-monthnav').style.visibility = moneyTab === 'list' || moneyTab === 'stat' ? 'visible' : 'hidden';
   if (moneyTab === 'ins') return renderIns();
   if (moneyTab === 'pts') return renderPts();
+  if (moneyTab === 'set') return renderSet();
   const list = db.expenses.filter(x => x.date.slice(0, 7) === moneyMonth)
     .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (b.t || 0) - (a.t || 0));
   const out = list.filter(x => txType(x) === 'expense').reduce((s, x) => s + x.amount, 0);
@@ -216,12 +220,10 @@ function renderMoney() {
           return `<button class="arow" data-id="${a.id}"><span class="xt">${esc(a.name)}<small>${name}${a.last4 ? `（${esc(a.last4)}）` : ''}${extra}</small></span>
           <b class="${b < 0 ? 'neg' : ''}">${money(b)}</b><span class="chev">›</span></button>`; }).join('');
     }
-    if (!db.accounts.length) h += '<p class="empty">還沒有帳戶。按下面「＋ 新增帳戶」，把信用卡、銀行、現金加進來，輸入現在的餘額就好。</p>';
-    h += '<div class="btns"><button class="primary" id="acct-add">＋ 新增帳戶</button><button id="csv-btn">匯入 CSV 檔案</button></div><p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。</p>';
+    if (!db.accounts.length) h += '<p class="empty">還沒有帳戶。到最下面「設定」→「新增帳戶」，把信用卡、銀行、現金加進來，輸入現在的餘額就好。</p>';
+    h += '<p class="tray-hint">新增帳戶、匯入 CSV 檔案在最下面的「設定」。</p>';
     $('#money-acct').innerHTML = renderIsland(net) + h;
     startPets();
-    $('#acct-add').onclick = () => openAccount(null);
-    $('#csv-btn').onclick = () => $('#csv-file').click();
   }
 }
 
@@ -721,6 +723,7 @@ function bindMoney() {
   $('#money-prev').onclick = () => { const [y, m] = moneyMonth.split('-').map(Number); moneyMonth = ymd(new Date(y, m - 2, 1)).slice(0, 7); renderMoney(); };
   $('#money-next').onclick = () => { const [y, m] = moneyMonth.split('-').map(Number); moneyMonth = ymd(new Date(y, m, 1)).slice(0, 7); renderMoney(); };
   $('#money-add').onclick = () => openExpense(null);
+  $('#money-new').onclick = () => moneyTab === 'ins' ? editIns(null) : editProg(null);
   $('#money-list').onclick = e => { const b = e.target.closest('.xrow'); if (!b) return; const x = db.expenses.find(z => z.id === b.dataset.id); if (!x) return;
     if (txType(x) === 'adjust') openAdjust(x); else openExpense(x); };
   document.querySelectorAll('.mntabs button').forEach(b => b.onclick = () => { moneyTab = b.dataset.tab; renderMoney(); $('.mscroll').scrollTop = 0; });
