@@ -458,3 +458,6 @@ body.th-money #sheet{background:#F7F7F4}
 .catm.lift{position:relative;z-index:5;transform:scale(1.03);box-shadow:0 8px 22px rgba(60,70,60,.22);background:#fff;border-radius:14px}
 .list.dragging{overflow:visible}
 .cm-grip{color:#B5B9B2;font-size:20px;padding:0 10px}
+
+/* v1.9 歡迎回來 */
+#money-title small.hello-date{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
