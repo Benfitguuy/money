@@ -257,10 +257,12 @@ function openExpense(x) {
         ${f.type === 'transfer' ? '' : `<label class="lrow"><span class="lk">商家</span><input id="x-merchant" value="${esc(f.merchant || '')}" placeholder="例如：Woolworths"></label>`}
         <label class="lrow"><span class="lk">備註</span><input id="x-note" value="${esc(f.note || '')}" placeholder="可以不填"></label>
       </div>
+      <p class="hint pos" id="x-pts">${expensePointsHint(f)}</p>
       ${db.accounts.length ? '' : '<p class="hint">還沒有帳戶的話，先到「帳戶」新增，餘額才會自動加減。</p>'}
       <p class="err" id="x-err"></p>
       ${isNew ? '' : '<div class="btns"><button class="danger" id="x-del">刪除這筆</button></div>'}`);
     const keep = () => { f.amount = $('#x-amt').value; f.date = $('#x-date').value; f.note = $('#x-note').value; if ($('#x-merchant')) f.merchant = $('#x-merchant').value; };
+    ['#x-amt', '#x-merchant', '#x-date', '#x-note'].forEach(s => { if ($(s)) $(s).addEventListener('input', () => { keep(); $('#x-pts').innerHTML = expensePointsHint(f); }); });
     $('#x-amt').oninput = () => { $('#x-err').textContent = ''; };
     $('#x-amt').onchange = () => { keep(); if (p) draw(); };
     if (isNew && !f.amount) setTimeout(() => $('#x-amt').focus(), 60);
@@ -634,7 +636,7 @@ let petRaf = 0;
 function walkable(x, y) {
   if (Math.abs(x - 190) / 160 + Math.abs(y - 121) / 86 > 0.8) return false;          // 島的邊緣
   if (((x - 271) / 48) ** 2 + ((y - 128) / 32) ** 2 < 1) return false;               // 池塘
-  if (x > 136 && x < 202 && y > 42 && y < 98) return false;                          // 房子
+  if (x > 148 && x < 184 && y > 74 && y < 94) return false;                           // 花草叢
   if (x > 76 && x < 132 && y > 108 && y < 142) return false;                          // 車子
   return true;
 }
@@ -711,9 +713,8 @@ function renderIsland(net) {
       <path d="M-1.6 -.6 Q0 .6 1.6 -.6" stroke="#3F7A35" stroke-width=".6" fill="none" stroke-linecap="round"/></g>
     <path d="M150 196 Q170 160 200 150 Q216 146 228 136" stroke="#EADCC0" stroke-width="14" fill="none" stroke-linecap="round"/>
     ${T}
-    <g transform="translate(146,40)"><rect x="0" y="22" width="44" height="30" rx="4" fill="#fff" stroke="#E2CDB4" stroke-width="2"/>
-      <path d="M-6 25 Q-6 22 -3 20 L19 4 Q22 1 25 4 L47 20 Q50 22 50 25Z" fill="#A9CDF0"/><path d="M4 14 L19 4 Q22 1 25 4 L40 14Z" fill="#FBD98A"/><path d="M12 8.6 L19 4 Q22 1 25 4 L32 8.6Z" fill="#F7B6C8"/>
-      <rect x="17" y="34" width="10" height="18" rx="2" fill="#F7B6C8"/><rect x="5" y="30" width="8" height="8" rx="2" fill="#A9CDF0"/><rect x="31" y="30" width="8" height="8" rx="2" fill="#FBD98A"/></g>
+    <g transform="translate(166,84)"><ellipse cx="0" cy="6" rx="16" ry="5" fill="#9CC48A"/><circle cx="-7" cy="0" r="7" fill="#86BE7E"/><circle cx="5" cy="-2" r="8" fill="#9CCD93"/>
+      <circle cx="-6" cy="-3" r="2" fill="#F6B6C8"/><circle cx="6" cy="-6" r="2" fill="#FBD98A"/><circle cx="2" cy="2" r="2" fill="#F6B6C8"/></g>
     <g class="car" transform="translate(104,126)">
       <ellipse cx="0" cy="13" rx="24" ry="4" fill="#000" opacity=".12"/>
       <path d="M-22 6 Q-22 -2 -14 -3 L-9 -11 Q-6 -15 0 -15 L9 -15 Q14 -15 17 -10 L20 -3 Q24 -2 24 6 L24 9 Q24 11 22 11 L-20 11 Q-22 11 -22 9Z" fill="#6FA8DC"/>
