@@ -405,3 +405,27 @@ body.th-money #sheet{background:#F7F7F4}
 .tomiles{display:block;margin:2px 0 6px auto;font-size:13px}
 .inl input{min-width:0}
 [hidden]{display:none!important}
+
+/* ===== v1.5 設定頁、六個分頁 ===== */
+.mnav{grid-template-columns:repeat(6,1fr);left:8px;right:8px}
+.mnav button{font-size:11px}
+.mnav svg{width:23px;height:23px}
+.newpill{background:#6E9478;color:#fff;font-weight:700;padding:8px 14px}
+.seg4{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.seg4 button{padding:9px 0;border-radius:12px;background:var(--soft);font-size:14px;border:2px solid transparent}
+.seg4 button.on{background:#E6EEE7;border-color:#6E9478;color:#3F5F47;font-weight:700}
+.ptotal{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 14px;border-radius:14px;background:#E6EEE7}
+.ptotal span{font-size:13px;color:#4E7F59}.ptotal b{font-size:18px;color:#3F5F47}
+.pill2{padding:10px 0;border-radius:14px;background:#E6EEE7;color:#3F5F47;font-weight:700;font-size:15px}
+.pill2#p-use{background:#F3E3E1;color:#9A5555}
+.catm{padding:0 6px 0 0}
+.cm-main{flex:1;display:flex;align-items:center;gap:10px;padding:12px 14px;text-align:left;min-width:0}
+.cm-mv{display:flex;gap:2px}.cm-mv button{width:32px;height:32px;border-radius:10px;color:#8E928C;font-size:12px}
+.cm-mv button:disabled{opacity:.25}
+.catprev{display:flex;align-items:center;gap:12px;margin:4px 0 2px;font-size:18px}
+.ci.big{width:46px;height:46px;font-size:24px;border-radius:14px}
+.colors{display:flex;flex-wrap:wrap;gap:8px}
+.colors button{width:34px;height:34px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #E2E1DC}
+.colors button.on{box-shadow:0 0 0 3px #6E9478}
+#sheet .iconin{width:52px;padding:6px;text-align:center;font-size:18px}
+.subr{grid-template-columns:1fr 0 34px}
