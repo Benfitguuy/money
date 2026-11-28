@@ -276,8 +276,13 @@ function renderSet() {
     <div class="sec sec-fl"><span>🌼 分類</span>${FLOWERS(5, 26)}</div>
     <div class="list"><button class="lrow" id="set-inc"><span class="ci" style="background:#DCEBDA">💰</span><span class="lv big">收入分類<small>${n('income')} 個</small></span><span class="chev">›</span></button>
       <button class="lrow" id="set-exp"><span class="ci" style="background:#F6E3D6">🍴</span><span class="lv big">支出分類<small>${n('expense')} 個</small></span><span class="chev">›</span></button></div>
+    <div class="sec">其他</div>
+    <div class="list"><button class="lrow" id="set-shop"><span class="ci">🏪</span><span class="lv big">商店<small>${SHOPS().length} 家・記一筆時可以選</small></span><span class="chev">›</span></button>
+      <button class="lrow" id="set-me"><span class="ci">📱</span><span class="lv big">這支手機是誰的<small>${getMe() ? (getMe() === 'ben' ? 'Ben' : 'Sarah') : '還沒設定'}</small></span><span class="chev">›</span></button></div>
     <p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。資料只存在這支手機。</p>`;
   $('#set-acct').onclick = () => openAccount(null);
+  $('#set-shop').onclick = () => manageStores();
+  $('#set-me').onclick = () => askMe(() => { closeSheet(); renderSet(); });
   $('#set-csv').onclick = () => $('#csv-file').click();
   $('#set-exp').onclick = () => manageCats('expense');
   $('#set-inc').onclick = () => manageCats('income');
@@ -488,4 +493,63 @@ function editPromo(src) {
       syncPointLog(['promo', src.id], 0, '', {}); db.promos = PROMOS().filter(z => z !== src); save(); closeSheet(); renderMoney(); toast('已刪除'); };
   };
   draw();
+}
+
+// ====================================================================
+// v2.4：誰記的、這支手機是誰的、商店（v2.2 的 app.js 已經在用，這裡補上）
+//  每筆記帳 x.by：ben | sarah | import | shortcut（之後 iPhone 捷徑記帳寫入時要帶 by:'shortcut'）
+//  「這支手機是誰的」存在 localStorage our-wallet-me（只在這支手機，不同步）
+//  db.stores：[{ id, name }]
+// ====================================================================
+const BY_NAME = { ben: 'Ben 記', sarah: 'Sarah 記', import: 'CSV 匯入', shortcut: '捷徑記帳' };
+const ME_KEY = 'our-wallet-me';
+function getMe() { try { const v = localStorage.getItem(ME_KEY); return v === 'ben' || v === 'sarah' ? v : ''; } catch (e) { return ''; } }
+function setMe(v) { try { localStorage.setItem(ME_KEY, v); } catch (e) { } }
+function byOf(x) { if (!x) return ''; if (BY_NAME[x.by]) return x.by; return x.src ? 'import' : ''; }
+function byTag(x) { const k = byOf(x); return k ? `<em class="bytag by-${k}">${BY_NAME[k]}</em>` : ''; }
+const whoSvg = who => `<svg viewBox="-18 -58 36 62" aria-hidden="true">${who === 'ben' ? charBen() : charSarah()}</svg>`;
+function askMe(next, back) {
+  const cur = getMe();
+  openSheet(`<div class="shead"><button class="txt" id="me-back">${back ? '‹ 返回' : '取消'}</button><b>這支手機是誰的？</b><span></span></div>
+    <p class="hint">選一次就好，之後在這支手機記的帳都會標上名字。之後可以在「設定」改。</p>
+    <div class="who2"><button data-me="ben" class="${cur === 'ben' ? 'on' : ''}">${whoSvg('ben')}Ben</button><button data-me="sarah" class="${cur === 'sarah' ? 'on' : ''}">${whoSvg('sarah')}Sarah</button></div>`);
+  $('#me-back').onclick = () => back ? back() : closeSheet();
+  $('#sheet').querySelectorAll('[data-me]').forEach(b => b.onclick = () => { setMe(b.dataset.me); toast(`這支手機是 ${b.dataset.me === 'ben' ? 'Ben' : 'Sarah'} 的`); next ? next() : closeSheet(); });
+}
+const DEFAULT_SHOPS = ['Woolworths', 'Coles', 'ALDI', 'IGA', 'Costco', 'Kmart', 'Bunnings', 'Chemist Warehouse', 'Big W', 'Target'];
+function SHOPS() { if (!Array.isArray(db.stores)) db.stores = DEFAULT_SHOPS.map(name => ({ id: uid(), name })); return db.stores; }
+const shopUse = () => { const m = {}; db.expenses.forEach(x => { if (x.merchant) { const k = x.merchant.toLowerCase(); m[k] = (m[k] || 0) + 1; } }); return m; };
+// 選商店：常去的排前面；done(名字)，done(null)＝自己打
+function pickStore(cur, done, back) {
+  const use = shopUse(), list = SHOPS().slice().sort((a, b) => (use[b.name.toLowerCase()] || 0) - (use[a.name.toLowerCase()] || 0));
+  openSheet(`<div class="shead"><button class="txt" id="s-back">‹ 返回</button><b>選擇商店</b><span></span></div>
+    <div class="list"><button class="lrow" data-i="-1"><span class="ci">✏️</span><span class="lv big">自己打</span></button>
+    ${list.map((s, i) => `<button class="lrow" data-i="${i}"><span class="ci">🏪</span><span class="lv big">${esc(s.name)}${use[s.name.toLowerCase()] ? `<small>${use[s.name.toLowerCase()]} 筆</small>` : ''}</span>${cur && cur.toLowerCase() === s.name.toLowerCase() ? '<span class="check">✓</span>' : ''}</button>`).join('')}</div>`);
+  $('#s-back').onclick = back;
+  $('#sheet').querySelectorAll('[data-i]').forEach(b => b.onclick = () => { const i = +b.dataset.i; done(i < 0 ? null : list[i].name); });
+}
+// 設定 › 商店：新增、改名（可連以前的帳一起改）、刪除
+function manageStores() {
+  const use = shopUse();
+  openSheet(`<div class="shead"><button class="txt" id="st-close">完成</button><b>商店</b><button class="txt strong" id="st-add">＋ 新增</button></div>
+    <div class="list">${SHOPS().map(s => `<button class="lrow" data-id="${s.id}"><span class="ci">🏪</span><span class="lv big">${esc(s.name)}<small>${use[s.name.toLowerCase()] || 0} 筆</small></span><span class="chev">›</span></button>`).join('')}</div>
+    <p class="hint">記一筆時「商家」可以直接打字，打了新的商店會自動加進來。</p>`);
+  $('#st-close').onclick = () => { closeSheet(); renderMoney(); };
+  $('#st-add').onclick = () => { const n = (prompt('新商店的名字') || '').trim(); if (!n) return;
+    if (SHOPS().some(s => s.name.toLowerCase() === n.toLowerCase())) return toast('已經有這家了');
+    SHOPS().push({ id: uid(), name: n }); save(); manageStores(); };
+  $('#sheet .list').onclick = e => { const b = e.target.closest('.lrow'); if (!b) return; const s = SHOPS().find(z => z.id === b.dataset.id); if (s) editStore(s); };
+}
+function editStore(s) {
+  const n = db.expenses.filter(x => x.merchant && x.merchant.toLowerCase() === s.name.toLowerCase()).length;
+  openSheet(`<div class="shead"><button class="txt" id="st-back">‹ 商店</button><b>修改商店</b><button class="txt strong" id="st-save">儲存</button></div>
+    <label>名字</label><input id="st-name" value="${esc(s.name)}">
+    ${n ? `<label class="lrow"><input type="checkbox" id="st-old" checked style="width:auto;margin:0"> 以前的 ${n} 筆帳也一起改名</label>` : ''}
+    <div class="btns"><button class="danger" id="st-del">刪除這家商店</button></div><p class="hint">刪除只會從清單拿掉，以前的帳不會被刪。</p>`);
+  $('#st-back').onclick = manageStores;
+  $('#st-save').onclick = () => { const v = $('#st-name').value.trim(); if (!v) return;
+    if ($('#st-old') && $('#st-old').checked) db.expenses.forEach(x => { if (x.merchant && x.merchant.toLowerCase() === s.name.toLowerCase()) x.merchant = v; });
+    s.name = v; save(); toast('已儲存'); manageStores(); };
+  $('#st-del').onclick = () => { $('#st-del').outerHTML = '<button class="danger" id="st-del2">確定刪除</button>';
+    $('#st-del2').onclick = () => { db.stores = SHOPS().filter(z => z !== s); save(); toast('已刪除'); manageStores(); }; };
 }
