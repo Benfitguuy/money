@@ -1,5 +1,5 @@
 // 離線快取：有網路時拿最新版，沒網路時用存起來的。改程式時把 VERSION 加一號。
-const VERSION = 'wallet-2.6.0';
+const VERSION = 'wallet-2.7.0';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './chars.js', './extra.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/boy.svg', './icons/girl.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
