@@ -212,7 +212,7 @@ function renderMoney() {
           <b class="${b < 0 ? 'neg' : ''}">${money(b)}</b><span class="chev">›</span></button>`; }).join('');
     }
     if (!db.accounts.length) h += '<p class="empty">還沒有帳戶。按下面「＋ 新增帳戶」，把信用卡、銀行、現金加進來，輸入現在的餘額就好。</p>';
-    h += '<div class="btns"><button class="primary" id="acct-add">＋ 新增帳戶</button><button id="csv-btn">從 DuoPurse 匯入（CSV 檔）</button></div><p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。</p>';
+    h += '<div class="btns"><button class="primary" id="acct-add">＋ 新增帳戶</button><button id="csv-btn">匯入 CSV 檔案</button></div><p class="tray-hint">卡號只要記末四碼就好，不要輸入完整卡號或密碼。</p>';
     $('#money-acct').innerHTML = renderIsland(net) + h;
     startPets();
     $('#acct-add').onclick = () => openAccount(null);
@@ -544,7 +544,7 @@ function importCSV(text) {
   const rows = parseCSV(text);
   const head = rows.shift() || [];
   const col = n => head.indexOf(n);
-  if (['日期', '類型', '金額', '帳戶'].some(n => col(n) < 0)) { toast('看不懂這個檔案，請用 DuoPurse 匯出的 CSV'); return; }
+  if (['日期', '類型', '金額', '帳戶'].some(n => col(n) < 0)) { toast('看不懂這個檔案，請確認是記帳 App 匯出的 CSV 檔案'); return; }
   const get = (r, n) => (col(n) >= 0 ? (r[col(n)] || '').trim() : '');
   const seen = {}, keyOf = r => { const k = head.map((h, i) => r[i]).join('|'); seen[k] = (seen[k] || 0) + 1; return k + '#' + seen[k]; };
   const have = new Set(db.expenses.filter(x => x.src).map(x => x.src));
@@ -560,11 +560,11 @@ function importCSV(text) {
   }
   const fresh = items.filter(i => !i.dup);
   const newAccts = [...acctNames].filter(n => !db.accounts.some(a => a.name === n));
-  openSheet(`<div class="shead"><button class="txt" id="i-no">取消</button><b>從 DuoPurse 匯入</b><span></span></div>
+  openSheet(`<div class="shead"><button class="txt" id="i-no">取消</button><b>匯入 CSV 檔案</b><span></span></div>
     <div class="summary"><div><span>紀錄</span><b>${items.length} 筆${items.length - fresh.length ? `（${items.length - fresh.length} 筆已經匯入過，會跳過）` : ''}</b></div>
       <div><span>帳戶</span><b>${[...acctNames].map(esc).join('、') || '—'}</b></div>
       ${newAccts.length ? `<div><span>新帳戶</span><b>會自動新增 ${newAccts.length} 個</b></div>` : ''}</div>
-    <p class="hint">沒有分類的「支出」（DuoPurse 用來調整餘額的）會變成「餘額校正」，不算進收支統計。匯入後會請你確認每個帳戶現在的餘額。</p>
+    <p class="hint">沒有分類的「支出」（通常是用來調整餘額的）會變成「餘額校正」，不算進收支統計。匯入後會請你確認每個帳戶現在的餘額。</p>
     <div class="btns"><button class="primary" id="i-ok"${fresh.length ? '' : ' disabled'}>匯入 ${fresh.length} 筆</button></div>`);
   $('#i-no').onclick = closeSheet;
   $('#i-ok').onclick = () => {
@@ -593,7 +593,7 @@ function importCSV(text) {
 
 function reconcileAccounts() {
   openSheet(`<div class="shead"><button class="txt" id="r-skip">先不用</button><b>確認帳戶餘額</b><button class="txt strong" id="r-ok">確定</button></div>
-    <p class="hint">下面是照紀錄算出來的餘額。請對照 DuoPurse 或網銀，把不一樣的改成正確金額（信用卡欠款請填負數，例如 -691.84）。</p>
+    <p class="hint">下面是照紀錄算出來的餘額。請對照原本的記帳 App 或網銀，把不一樣的改成正確金額（信用卡欠款請填負數，例如 -691.84）。</p>
     ${db.accounts.map(a => `<label>${ACCT_T[a.type].icon} ${esc(a.name)}</label><input type="number" inputmode="decimal" step="0.01" data-a="${a.id}" value="${acctBalance(a)}">`).join('')}`);
   $('#r-skip').onclick = () => { closeSheet(); moneyTab = 'acct'; renderMoney(); };
   $('#r-ok').onclick = () => {
