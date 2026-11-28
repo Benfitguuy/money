@@ -515,3 +515,10 @@ body.th-money .island{background:linear-gradient(#BFE2F4 0%,#DCF0F4 42%,#F4FAF6 
 /* v2.5 */
 .ins-ended .pcard{opacity:.6}
 #a-cardbox .list{margin-bottom:6px}
+
+/* v2.6 帳戶表單 */
+.bankchips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+.bankchips button{padding:7px 12px;border-radius:12px;background:#ECEBE6;font-size:14px;font-weight:700;color:#5A5A55;border:2px solid transparent}
+.bankchips button.on{background:#EEF4EF;border-color:#6E9478;color:#3F6B4C}
+#a-namebox[hidden],#a-fdbox[hidden],#a-pdbox[hidden],#a-cardbox[hidden]{display:none}
+.due-preview b{color:#B66C6C}
