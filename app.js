@@ -119,7 +119,10 @@ function cardPeriod(a, today = ymd(new Date())) {
   const start = new Date(end.getFullYear(), end.getMonth() - 1, sd + 1);
   return [ymd(start), ymd(end)];
 }
-function planValue(p, amount) { return p.kind === 'cash' ? amount * (p.rate || 0) / 100 : (p.per ? amount / p.per : 0); }
+function planValue(p, amount) {
+  if (p.kind === 'cash') return amount * (p.rate || 0) / 100;
+  return p.mode === 'mpd' ? amount * (p.mpd || 0) : (p.per ? amount / p.per : 0);     // mpd：每 1 元 X 哩；per：每 X 元 1 哩
+}
 function cardRebate(a) {                          // 本期預估回饋（依每筆記帳時套用的方案）
   const [s, e] = cardPeriod(a);
   const today = ymd(new Date());
@@ -138,16 +141,18 @@ function cardRebate(a) {                          // 本期預估回饋（依每
   });
   return { s, e, spend: rows.reduce((t, x) => t + x.amount, 0), lines, none, cash, miles, n: rows.length };
 }
-const planLabel = p => p.kind === 'cash' ? `${p.name} ${p.rate}%` : `${p.name} ${p.per} 元/哩`;
+const planLabel = p => p.kind === 'cash' ? `${p.name} ${p.rate}%` : p.mode === 'mpd' ? `${p.name} 每 1 元 ${p.mpd} 哩` : `${p.name} 每 ${p.per} 元 1 哩`;
 const rebateText = (cash, miles) => [cash ? money(cash) : '', miles ? num1(miles) + ' 哩' : ''].filter(Boolean).join('＋') || '—';
 
 // ---------- 畫面 ----------
 function renderMoney() {
   const [y, m] = moneyMonth.split('-').map(Number);
-  $('#money-title').textContent = moneyTab === 'acct' ? '我們的錢包' : `${y}年${m}月`;
+  $('#money-title').textContent = { acct: '我們的錢包', ins: '保險', pts: '航空點數' }[moneyTab] || `${y}年${m}月`;
   document.querySelectorAll('.mntabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === moneyTab));
-  ['list', 'stat', 'acct'].forEach(t => $('#money-' + t).hidden = t !== moneyTab);
-  $('#money-monthnav').style.visibility = moneyTab === 'acct' ? 'hidden' : 'visible';
+  ['list', 'stat', 'acct', 'ins', 'pts'].forEach(t => $('#money-' + t).hidden = t !== moneyTab);
+  $('#money-monthnav').style.visibility = moneyTab === 'list' || moneyTab === 'stat' ? 'visible' : 'hidden';
+  if (moneyTab === 'ins') return renderIns();
+  if (moneyTab === 'pts') return renderPts();
   const list = db.expenses.filter(x => x.date.slice(0, 7) === moneyMonth)
     .sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : (b.t || 0) - (a.t || 0));
   const out = list.filter(x => txType(x) === 'expense').reduce((s, x) => s + x.amount, 0);
@@ -401,20 +406,24 @@ function openCard(a) {
     <div class="card">
       <div class="mbal" style="border:0;margin:0;padding:0"><span>本期預估回饋</span><b class="pos">${rebateText(r.cash, r.miles)}</b></div>
       ${r.lines.map(l => `<div class="pline"><span>${esc(planLabel(l.p))}<small>消費 ${money(l.spend)}${l.p.cap ? `・上限 ${l.p.kind === 'cash' ? money(l.p.cap) : num1(l.p.cap) + ' 哩'}` : ''}</small></span>
-        <b>${l.p.kind === 'cash' ? money(l.v) : num1(l.v) + ' 哩'}</b></div>`).join('')}
+        <b>${l.p.kind === 'cash' ? money(l.v) : num1(l.v) + ' 哩'}</b></div>${l.p.kind === 'miles' && l.v > 0 ? (() => { const nt = `${r.e.slice(5).replace('-', '/')} 期 ${l.p.name}`;
+          return a.rebates.some(g => g.note === nt) ? '<p class="hint" style="text-align:right">✓ 這期已存入</p>'
+            : `<button class="txt strong tomiles" data-plan2="${l.p.id}" data-v="${Math.floor(l.v)}" data-note="${esc(nt)}">✈️ 存入${progOf(l.p.prog) ? ' ' + esc(progOf(l.p.prog).airline) : '航空點數'}（${num1(Math.floor(l.v))} 點）</button>`; })() : ''}`).join('')}
       ${r.none ? `<div class="pline"><span>未套用方案</span><b class="muted">消費 ${money(r.none)}</b></div>` : ''}
       <p class="hint">依記帳時套用的方案估算，僅供參考；實際回饋以銀行入帳為準。</p></div>
     <div class="sec acc-sec"><span>回饋方案</span><button class="txt strong" id="k-addplan">＋ 新增</button></div>
     <div class="list">${a.plans.length ? a.plans.map(p => `<button class="lrow" data-plan="${p.id}"><span class="lv big">${esc(planLabel(p))}${p.isDefault ? '<small>預設</small>' : ''}${p.cap ? `<small>每期上限 ${p.kind === 'cash' ? money(p.cap) : p.cap + ' 哩'}</small>` : ''}</span><span class="chev">›</span></button>`).join('')
       : '<p class="empty" style="padding:10px 12px">還沒有回饋方案，按「＋ 新增」設定這張卡的回饋。</p>'}</div>
     <div class="sec acc-sec"><span>回饋紀錄（實際拿到的）</span><button class="txt strong" id="k-addreb">＋ 記一筆</button></div>
-    <div class="list">${got.length ? got.map(g => `<button class="lrow" data-reb="${g.id}"><span class="lv big">${g.kind === 'cash' ? money(g.value) : num1(g.value) + ' 哩'}<small>${g.date}${g.note ? '・' + esc(g.note) : ''}</small></span><span class="chev">›</span></button>`).join('')
+    <div class="list">${got.length ? got.map(g => `<button class="lrow" data-reb="${g.id}"><span class="lv big">${g.kind === 'cash' ? money(g.value) : num1(g.value) + ' 哩'}<small>${g.date}${g.note ? '・' + esc(g.note) : ''}${g.kind === 'miles' && progOf(g.prog) ? '・已存入 ' + esc(progOf(g.prog).airline) : ''}</small></span><span class="chev">›</span></button>`).join('')
       : '<p class="empty" style="padding:10px 12px">銀行回饋入帳後記在這裡。</p>'}</div>
     ${got.length ? `<p class="hint">累計拿到：${rebateText(got.filter(g => g.kind === 'cash').reduce((s, g) => s + g.value, 0), got.filter(g => g.kind === 'miles').reduce((s, g) => s + g.value, 0))}</p>` : ''}`);
   $('#k-close').onclick = () => { closeSheet(); renderMoney(); };
   $('#k-edit').onclick = () => editAccount(a, () => openCard(a));
   $('#k-addplan').onclick = () => editPlan(a, null);
   $('#k-addreb').onclick = () => editRebate(a, null);
+  $('#sheet').querySelectorAll('.tomiles').forEach(b => b.onclick = () => { const p = a.plans.find(q => q.id === b.dataset.plan2);
+    editRebate(a, null, { kind: 'miles', value: +b.dataset.v, prog: p && p.prog, note: b.dataset.note }); });
   $('#sheet').querySelectorAll('[data-plan]').forEach(b => b.onclick = () => editPlan(a, a.plans.find(p => p.id === b.dataset.plan)));
   $('#sheet').querySelectorAll('[data-reb]').forEach(b => b.onclick = () => editRebate(a, a.rebates.find(g => g.id === b.dataset.reb)));
 }
@@ -422,15 +431,19 @@ function openCard(a) {
 function editPlan(a, p) {
   const isNew = !p;
   const v = p || { name: '', kind: 'cash', rate: '', per: '', cap: '', isDefault: !a.plans.some(q => q.isDefault) };
-  let kind = v.kind;
+  let kind = v.kind, mode = v.mode || 'per';
   openSheet(`
     <div class="shead"><button class="txt" id="q-cancel">取消</button><b>${isNew ? '新增回饋方案' : '修改回饋方案'}</b><button class="txt strong" id="q-save">儲存</button></div>
     <label>方案名稱</label><input id="q-name" value="${esc(v.name)}" placeholder="例如：一般消費、海外、串流">
     <label>回饋型態</label>
     <div class="seg seg2" id="q-kind"><button type="button" data-k="cash" class="${kind === 'cash' ? 'on' : ''}">現金回饋</button><button type="button" data-k="miles" class="${kind === 'miles' ? 'on' : ''}">里程回饋</button></div>
     <div id="q-cash"><label>回饋比例</label><div class="inl"><input id="q-rate" type="number" inputmode="decimal" step="0.01" value="${v.rate}" placeholder="例如：1.5"><span>%</span></div></div>
-    <div id="q-miles"><label>累積哩程</label><div class="inl"><span>每</span><input id="q-per" type="number" inputmode="decimal" step="0.01" value="${v.per}" placeholder="例如：0.4"><span>元累積 1 哩</span></div>
-      <p class="hint">記帳時用「金額 ÷ 每哩消費額」估算哩數，僅供參考。</p></div>
+    <div id="q-miles"><label>累積算法</label>
+      <div class="seg seg2" id="q-mode"><button type="button" data-m="per" class="${mode === 'per' ? 'on' : ''}">每花多少錢 1 哩</button><button type="button" data-m="mpd" class="${mode === 'mpd' ? 'on' : ''}">每 1 元幾哩</button></div>
+      <div class="inl" id="q-perbox"><span>每花 A$</span><input id="q-per" type="number" inputmode="decimal" step="0.01" value="${v.per}" placeholder="2.5"><span>累積 1 哩</span></div>
+      <div class="inl" id="q-mpdbox"><span>每 A$1 累積</span><input id="q-mpd" type="number" inputmode="decimal" step="0.01" value="${v.mpd || ''}" placeholder="0.4"><span>哩</span></div>
+      <p class="hint">例如「每 A$2.5 一哩」選左邊填 2.5；「每 A$1 = 0.4 哩」選右邊填 0.4（兩個其實一樣）。</p>
+      <label>里程存到哪個航空點數</label><select id="q-prog">${progOptions(v.prog, PTS().length ? '先不選' : '（還沒有，先到「點數」頁新增）')}</select></div>
     <label class="check"><input type="checkbox" id="q-capon"${v.cap ? ' checked' : ''}> 每期回饋上限</label>
     <div id="q-capbox"><div class="inl"><input id="q-cap" type="number" inputmode="decimal" step="0.01" value="${v.cap}" placeholder="上限"><span id="q-capu"></span></div></div>
     <label class="check"><input type="checkbox" id="q-def"${v.isDefault ? ' checked' : ''}> 設為預設方案</label>
@@ -438,19 +451,24 @@ function editPlan(a, p) {
     <p class="err" id="q-err"></p>
     ${isNew ? '' : '<div class="btns"><button class="danger" id="q-del">刪除這個方案</button></div>'}`);
   const paint = () => { $('#q-cash').hidden = kind !== 'cash'; $('#q-miles').hidden = kind !== 'miles';
+    $('#q-perbox').hidden = mode !== 'per'; $('#q-mpdbox').hidden = mode !== 'mpd';
     $('#q-capbox').hidden = !$('#q-capon').checked; $('#q-capu').textContent = kind === 'cash' ? 'A$' : '哩'; };
   paint();
   $('#q-kind').onclick = e => { const b = e.target.closest('button'); if (!b) return; kind = b.dataset.k;
     $('#q-kind').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
   $('#q-capon').onchange = paint;
+  $('#q-mode').onclick = e => { const b = e.target.closest('button'); if (!b) return; mode = b.dataset.m;
+    $('#q-mode').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
   $('#q-cancel').onclick = () => openCard(a);
   $('#q-save').onclick = () => {
     const name = $('#q-name').value.trim() || (kind === 'cash' ? '現金回饋' : '里程回饋');
     const rate = parseFloat($('#q-rate').value), per = parseFloat($('#q-per').value), cap = $('#q-capon').checked ? parseFloat($('#q-cap').value) : '';
     if (kind === 'cash' && !(rate > 0)) return $('#q-err').textContent = '請填回饋比例';
-    if (kind === 'miles' && !(per > 0)) return $('#q-err').textContent = '請填每幾元累積 1 哩';
+    const mpd = parseFloat($('#q-mpd').value);
+    if (kind === 'miles' && mode === 'per' && !(per > 0)) return $('#q-err').textContent = '請填每花多少錢累積 1 哩';
+    if (kind === 'miles' && mode === 'mpd' && !(mpd > 0)) return $('#q-err').textContent = '請填每 1 元累積幾哩';
     const plan = p || { id: uid() };
-    Object.assign(plan, { name, kind, rate: kind === 'cash' ? rate : '', per: kind === 'miles' ? per : '', cap: cap > 0 ? cap : '', isDefault: $('#q-def').checked });
+    Object.assign(plan, { name, kind, rate: kind === 'cash' ? rate : '', mode, per: kind === 'miles' && mode === 'per' ? per : '', mpd: kind === 'miles' && mode === 'mpd' ? mpd : '', prog: kind === 'miles' ? $('#q-prog').value : '', cap: cap > 0 ? cap : '', isDefault: $('#q-def').checked });
     if (isNew) a.plans.push(plan);
     if (plan.isDefault) a.plans.forEach(q => { if (q !== plan) q.isDefault = false; });
     save(); toast('已儲存'); openCard(a);
@@ -461,21 +479,23 @@ function editPlan(a, p) {
   };
 }
 
-function editRebate(a, g) {
+function editRebate(a, g, preset) {
   const isNew = !g;
-  const v = g || { date: ymd(new Date()), kind: (a.plans.find(q => q.isDefault) || a.plans[0] || { kind: 'cash' }).kind, value: '', note: '' };
+  const dp = a.plans.find(q => q.isDefault) || a.plans[0] || { kind: 'cash' };
+  const v = g || Object.assign({ date: ymd(new Date()), kind: dp.kind, value: '', note: '', prog: dp.prog || '' }, preset || {});
   let kind = v.kind;
   openSheet(`
     <div class="shead"><button class="txt" id="g-cancel">取消</button><b>${isNew ? '記一筆回饋' : '修改回饋'}</b><button class="txt strong" id="g-save">儲存</button></div>
     <div class="seg seg2" id="g-kind"><button type="button" data-k="cash" class="${kind === 'cash' ? 'on' : ''}">現金回饋</button><button type="button" data-k="miles" class="${kind === 'miles' ? 'on' : ''}">里程</button></div>
     <label id="g-vl"></label><input id="g-val" type="number" inputmode="decimal" step="0.01" value="${v.value}" class="big">
     <label>日期</label><input id="g-date" type="date" value="${v.date}">
+    <div id="g-progbox"><label>存到哪個航空點數</label><select id="g-prog">${progOptions(v.prog, '不存入（只記在這張卡）')}</select></div>
     <label>備註</label><input id="g-note" value="${esc(v.note || '')}" placeholder="例如：11 月帳單回饋">
     <p class="hint" id="g-hint"></p>
     <p class="err" id="g-err"></p>
     ${isNew ? '' : '<div class="btns"><button class="danger" id="g-del">刪除</button></div>'}`);
   const paint = () => { $('#g-vl').textContent = kind === 'cash' ? '回饋金額（A$）' : '拿到幾哩';
-    $('#g-hint').textContent = kind === 'cash' ? '現金回饋會自動記成這張卡的一筆「收入・信用卡回饋」，欠款會跟著減少。' : '里程不影響帳戶餘額，只記錄累積多少。'; };
+    $('#g-hint').textContent = kind === 'cash' ? '現金回饋會自動記成這張卡的一筆「收入・信用卡回饋」，欠款會跟著減少。' : '里程不影響帳戶餘額；選了航空點數，會自動加到那裡的點數並留紀錄。'; $('#g-progbox').hidden = kind !== 'miles'; };
   paint();
   $('#g-kind').onclick = e => { const b = e.target.closest('button'); if (!b) return; kind = b.dataset.k;
     $('#g-kind').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
@@ -485,7 +505,8 @@ function editRebate(a, g) {
     if (!(value > 0)) return $('#g-err').textContent = '請填數字';
     const reb = g || { id: uid() };
     if (reb.tx) db.expenses = db.expenses.filter(x => x.id !== reb.tx);          // 修改時先拿掉舊的那筆收入
-    Object.assign(reb, { kind, value, date: $('#g-date').value || ymd(new Date()), note: $('#g-note').value.trim(), tx: '' });
+    Object.assign(reb, { kind, value, date: $('#g-date').value || ymd(new Date()), note: $('#g-note').value.trim(), tx: '', prog: kind === 'miles' ? $('#g-prog').value : '' });
+    syncPointLog(['reb', reb.id], kind === 'miles' ? value : 0, reb.prog, { date: reb.date, src: 'card', note: reb.note });
     if (kind === 'cash') { const id = uid(); reb.tx = id;
       db.expenses.push({ id, t: Date.now(), type: 'income', amount: value, cat: 'rebate', sub: '', acct: a.id, date: reb.date, merchant: '', note: reb.note || `${a.name} 回饋` }); }
     if (isNew) a.rebates.push(reb);
@@ -493,6 +514,7 @@ function editRebate(a, g) {
   };
   if (!isNew) $('#g-del').onclick = () => {
     if (g.tx) db.expenses = db.expenses.filter(x => x.id !== g.tx);
+    syncPointLog(['reb', g.id], 0, '', {});
     a.rebates = a.rebates.filter(z => z !== g); save(); toast('已刪除'); openCard(a);
   };
 }
@@ -701,7 +723,7 @@ function bindMoney() {
   $('#money-add').onclick = () => openExpense(null);
   $('#money-list').onclick = e => { const b = e.target.closest('.xrow'); if (!b) return; const x = db.expenses.find(z => z.id === b.dataset.id); if (!x) return;
     if (txType(x) === 'adjust') openAdjust(x); else openExpense(x); };
-  document.querySelectorAll('.mntabs button').forEach(b => b.onclick = () => { moneyTab = b.dataset.tab; renderMoney(); });
+  document.querySelectorAll('.mntabs button').forEach(b => b.onclick = () => { moneyTab = b.dataset.tab; renderMoney(); $('.mscroll').scrollTop = 0; });
   document.querySelectorAll('.st-kind button').forEach(b => b.onclick = () => { statKind = b.dataset.k; renderMoney(); });
   document.querySelectorAll('.st-by button').forEach(b => b.onclick = () => { statBy = b.dataset.b; renderMoney(); });
   $('#money-acct').onclick = e => { const b = e.target.closest('.arow'); if (b) openAccount(db.accounts.find(a => a.id === b.dataset.id)); };
