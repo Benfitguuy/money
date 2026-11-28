@@ -303,7 +303,7 @@ function pickCategory(kind, cur, curSub, done, back) {
   let open = null;                                // 正在看哪一個分類的子項目
   const draw = () => {
     if (!open) {
-      openSheet(`<div class="shead"><button class="txt" id="c-back">‹ 返回</button><b>選擇${kind === 'income' ? '收入' : '消費'}分類</b><span></span></div>
+      openSheet(`<div class="shead"><button class="txt" id="c-back">‹ 返回</button><b>選擇${kind === 'income' ? '收入' : '支出'}分類</b><span></span></div>
         <div class="list">${catsOf(kind).map(c => `<button class="lrow cat" data-k="${c.k}">${catIcon(c.k)}<span class="lv big">${esc(c.name)}${c.k === cur && curSub ? `<small>${esc(subName(c.k, curSub))}</small>` : ''}</span>
           ${c.subs.length ? '<span class="chev">›</span>' : (c.k === cur ? '<span class="check">✓</span>' : '')}</button>`).join('')}</div>
         <div class="btns"><button id="c-new">＋ 新增分類</button></div>`);
@@ -635,8 +635,11 @@ function reconcileAccounts() {
 
 // ---------- 島上的小動物自由走動（布偶貓、卡爾比犬） ----------
 let petRaf = 0;
+const ISL_INNER = [[83, 102], [118, 83], [156, 74], [178, 62], [210, 64], [247, 75], [282, 86], [313, 104], [326, 125], [314, 142], [288, 152], [267, 170], [235, 182], [198, 189], [165, 195], [133, 184], [101, 170], [74, 154], [57, 133], [64, 115]];
+function inPoly(x, y, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j];
+  if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
 function walkable(x, y) {
-  if (Math.abs(x - 190) / 160 + Math.abs(y - 121) / 86 > 0.8) return false;          // 島的邊緣
+  if (!inPoly(x, y, ISL_INNER)) return false;                                         // 島的邊緣（v2.1 不規則形狀）
   if (((x - 271) / 48) ** 2 + ((y - 128) / 32) ** 2 < 1) return false;               // 池塘
   if (x > 148 && x < 184 && y > 74 && y < 94) return false;                           // 花草叢
   if (x > 76 && x < 132 && y > 108 && y < 142) return false;                          // 車子
@@ -710,9 +713,11 @@ function renderIsland(net) {
   return `<div class="island card"><svg viewBox="0 0 380 230" role="img" aria-label="我們的小島"><defs><radialGradient id="ragmask" cx="50%" cy="58%" r="55%"><stop offset="0" stop-color="#5E4232" stop-opacity=".95"/><stop offset=".6" stop-color="#7A5A48" stop-opacity=".6"/><stop offset="1" stop-color="#8A6A55" stop-opacity="0"/></radialGradient></defs>
     <g class="cloud c1"><ellipse cx="60" cy="34" rx="26" ry="11" fill="#fff"/><ellipse cx="74" cy="27" rx="15" ry="11" fill="#fff"/></g>
     <g class="cloud c2"><ellipse cx="300" cy="26" rx="30" ry="12" fill="#fff"/><ellipse cx="316" cy="18" rx="17" ry="12" fill="#fff"/></g>
-    <path d="M30 128 Q30 112 48 104 L172 48 Q190 40 208 48 L332 104 Q350 112 350 128 L350 146 Q350 160 332 168 L208 222 Q190 230 172 222 L48 168 Q30 160 30 146Z" fill="#E9D8B8"/>
-    <path d="M30 128 Q30 112 48 104 L172 48 Q190 40 208 48 L332 104 Q350 112 350 128 L350 138 Q350 152 332 160 L208 214 Q190 222 172 214 L48 160 Q30 152 30 138Z" fill="#A8C98F"/>
-    <path d="M30 122 Q30 106 48 98 L172 42 Q190 34 208 42 L332 98 Q350 106 350 122 Q350 136 332 144 L208 200 Q190 208 172 200 L48 144 Q30 136 30 122Z" fill="#C3DFA8"/>
+    <path d="M62 114 C72.7 107.3 89.3 96.0 104 90 C118.7 84.0 138.0 82.3 150 78 C162.0 73.7 165.3 66.0 176 64 C186.7 62.0 200.3 63.3 214 66 C227.7 68.7 243.7 75.3 258 80 C272.3 84.7 287.0 88.0 300 94 C313.0 100.0 327.3 108.0 336 116 C344.7 124.0 351.7 134.0 352 142 C352.3 150.0 345.7 158.3 338 164 C330.3 169.7 315.3 170.3 306 176 C296.7 181.7 292.3 191.7 282 198 C271.7 204.3 257.7 210.0 244 214 C230.3 218.0 214.0 219.3 200 222 C186.0 224.7 173.0 231.0 160 230 C147.0 229.0 134.7 221.3 122 216 C109.3 210.7 95.7 204.3 84 198 C72.3 191.7 60.7 185.7 52 178 C43.3 170.3 34.0 160.0 32 152 C30.0 144.0 35.0 136.3 40 130 C45.0 123.7 51.3 120.7 62 114Z" fill="#E9D8B8"/>
+    <path d="M62 106 C72.7 99.3 89.3 88.0 104 82 C118.7 76.0 138.0 74.3 150 70 C162.0 65.7 165.3 58.0 176 56 C186.7 54.0 200.3 55.3 214 58 C227.7 60.7 243.7 67.3 258 72 C272.3 76.7 287.0 80.0 300 86 C313.0 92.0 327.3 100.0 336 108 C344.7 116.0 351.7 126.0 352 134 C352.3 142.0 345.7 150.3 338 156 C330.3 161.7 315.3 162.3 306 168 C296.7 173.7 292.3 183.7 282 190 C271.7 196.3 257.7 202.0 244 206 C230.3 210.0 214.0 211.3 200 214 C186.0 216.7 173.0 223.0 160 222 C147.0 221.0 134.7 213.3 122 208 C109.3 202.7 95.7 196.3 84 190 C72.3 183.7 60.7 177.7 52 170 C43.3 162.3 34.0 152.0 32 144 C30.0 136.0 35.0 128.3 40 122 C45.0 115.7 51.3 112.7 62 106Z" fill="#A8C98F"/>
+    <path d="M62 96 C72.7 89.3 89.3 78.0 104 72 C118.7 66.0 138.0 64.3 150 60 C162.0 55.7 165.3 48.0 176 46 C186.7 44.0 200.3 45.3 214 48 C227.7 50.7 243.7 57.3 258 62 C272.3 66.7 287.0 70.0 300 76 C313.0 82.0 327.3 90.0 336 98 C344.7 106.0 351.7 116.0 352 124 C352.3 132.0 345.7 140.3 338 146 C330.3 151.7 315.3 152.3 306 158 C296.7 163.7 292.3 173.7 282 180 C271.7 186.3 257.7 192.0 244 196 C230.3 200.0 214.0 201.3 200 204 C186.0 206.7 173.0 213.0 160 212 C147.0 211.0 134.7 203.3 122 198 C109.3 192.7 95.7 186.3 84 180 C72.3 173.7 60.7 167.7 52 160 C43.3 152.3 34.0 142.0 32 134 C30.0 126.0 35.0 118.3 40 112 C45.0 105.7 51.3 102.7 62 96Z" fill="#C3DFA8"/>
+    <g class="isl-deco"><circle cx="70" cy="128" r="2.2" fill="#F6B6C8"/><circle cx="76" cy="132" r="1.8" fill="#FBD98A"/><circle cx="318" cy="132" r="2" fill="#F8F0E3"/><circle cx="312" cy="138" r="1.6" fill="#F6B6C8"/>
+      <circle cx="196" cy="190" r="2" fill="#C9B6EA"/><circle cx="203" cy="194" r="1.7" fill="#FBD98A"/><ellipse cx="128" cy="186" rx="5" ry="3" fill="#B7B0A2"/><ellipse cx="135" cy="188" rx="3" ry="2" fill="#CBC4B6"/></g>
     <defs><clipPath id="pondclip"><path d="M232 120 Q236 104 258 104 L300 112 Q318 118 310 134 L290 150 Q276 160 256 152 L238 140 Q228 132 232 120Z"/></clipPath></defs>
     <path d="M232 120 Q236 104 258 104 L300 112 Q318 118 310 134 L290 150 Q276 160 256 152 L238 140 Q228 132 232 120Z" fill="#8FC2D8" stroke="#D9CDB7" stroke-width="5" stroke-linejoin="round"/>
     <path class="water" d="M232 120 Q236 104 258 104 L300 112 Q318 118 310 134 L290 150 Q276 160 256 152 L238 140 Q228 132 232 120Z" fill="#9CC9DE"/>
