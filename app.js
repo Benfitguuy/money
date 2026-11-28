@@ -119,6 +119,28 @@ function cardPeriod(a, today = ymd(new Date())) {
   const start = new Date(end.getFullYear(), end.getMonth() - 1, sd + 1);
   return [ymd(start), ymd(end)];
 }
+// v2.6 結算日、繳費日
+const BANKS = ['CommBank', 'ANZ', 'ING', 'NAB', 'Westpac', 'Amex', 'Bankwest', 'Macquarie', 'ubank', 'Up'];
+const stmtOn = (sd, y, m) => ymd(new Date(y, m, Math.min(sd, new Date(y, m + 1, 0).getDate())));     // 某個月的第 sd 號（月底不夠就用最後一天）
+function dueOf(a, stmt) {                         // stmt 那天結算的這期，哪天要繳
+  const d = parseYmd(stmt);
+  if (a.payMode === 'free') return +a.freeDays > 0 && +a.statementDay > 0 ? addDays(stmtOn(+a.statementDay, d.getFullYear(), d.getMonth() - 1), +a.freeDays) : '';
+  for (let k = 0; k < 3; k++) { if (!(+a.payDay > 0)) break; const p = stmtOn(+a.payDay, d.getFullYear(), d.getMonth() + k); if (p > stmt) return p; }
+  return '';
+}
+function nextDue(a, from = ymd(new Date())) {      // 今天（含）以後最近一次繳費：{ s: 結算日, due: 繳費日 }
+  const d = parseYmd(from);
+  if (a.payMode === 'free') {
+    if (!(+a.statementDay > 0 && +a.freeDays > 0)) return null;
+    for (let k = -3; k <= 2; k++) { const s = stmtOn(+a.statementDay, d.getFullYear(), d.getMonth() + k), due = dueOf(a, s); if (due >= from) return { s, due }; }
+    return null;
+  }
+  if (!(+a.payDay > 0)) return null;
+  for (let k = 0; k < 3; k++) { const p = stmtOn(+a.payDay, d.getFullYear(), d.getMonth() + k); if (p >= from) return { s: '', due: p }; }
+  return null;
+}
+const mdFmt = s => { const d = parseYmd(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
 function planValue(p, amount) {
   if (p.kind === 'cash') return amount * (p.rate || 0) / 100;
   return p.mode === 'mpd' ? amount * (p.mpd || 0) : (p.per ? amount / p.per : 0);     // mpd：每 1 元 X 哩；per：每 X 元 1 哩
@@ -362,22 +384,31 @@ function openAccount(a) {
 function editAccount(a, back, draft) {
   const isNew = !a;
   // draft：去編輯回饋方案再回來時，先把表單填的內容收著（方案也先放 draft，按「儲存」才真的存）
-  const v = draft || a || { name: '', type: 'bank', last4: '', statementDay: '', payDay: '' };
+  const v = draft || a || { name: '', type: 'bank', last4: '', statementDay: '', payDay: '', payMode: 'free', freeDays: '' };
   const plans = draft ? draft.plans : (a && a.plans ? a.plans.map(p => ({ ...p })) : []);
   const bal = a ? acctBalance(a) : '';
   const balVal = draft ? draft.bal : (a ? Math.abs(v.type === 'credit' ? Math.min(0, bal) : bal) : '');
   let type = v.type;
+  let bank = BANKS.includes(v.name) ? v.name : (v.name && v.type !== 'cash' ? '__other' : '');      // v2.6 從清單選
+  let pm = v.payMode === 'day' || (!v.payMode && v.payDay) ? 'day' : 'free';
+  const FREE = [44, 45, 50, 55, 62];
   openSheet(`
     <div class="shead"><button class="txt" id="a-cancel">${back ? '‹ 返回' : '取消'}</button><b>${isNew ? '新增帳戶' : '修改帳戶'}</b><button class="txt strong" id="a-save">儲存</button></div>
-    <label>帳戶名稱</label><input id="a-name" value="${esc(v.name)}" placeholder="例如：大白、Ubank、現金">
     <label>種類</label>
     <div class="seg seg3" id="a-type">${ACCT_TYPES.map(([k, i, n]) => `<button type="button" data-k="${k}" class="${k === v.type ? 'on' : ''}">${i} ${n}</button>`).join('')}</div>
-    <label>卡號或帳號末四碼 <span class="opt-tag">可不填</span></label><input id="a-last4" inputmode="numeric" maxlength="4" value="${esc(v.last4 || '')}" placeholder="1234">
-    <div id="a-cardbox"><div class="row2"><div><label>每月幾號結算 <span class="opt-tag">可不填</span></label>
-      <input id="a-sd" type="number" inputmode="numeric" min="1" max="28" value="${v.statementDay || ''}" placeholder="例如：18"></div>
-      <div><label>每月幾號繳費 <span class="opt-tag">可不填</span></label>
-      <input id="a-pd" type="number" inputmode="numeric" min="1" max="31" value="${v.payDay || ''}" placeholder="例如：5"></div></div>
-      <p class="hint">填了的話，行事曆那天上面會有「💳 結算／繳費」整天提醒。</p>
+    <div id="a-namebox"><label>哪一家</label>
+      <div class="bankchips" id="a-banks">${BANKS.map(b => `<button type="button" data-b="${b}" class="${bank === b ? 'on' : ''}">${b}</button>`).join('')}<button type="button" data-b="__other" class="${bank === '__other' ? 'on' : ''}">✏️ 其他</button></div>
+      <input id="a-name" value="${bank === '__other' ? esc(v.name) : ''}" placeholder="自己取名，例如：ANZ 儲蓄、大白"${bank === '__other' ? '' : ' hidden'}>
+      <p class="hint" id="a-namehint"></p>
+      <label>卡號或帳號末四碼 <span class="opt-tag">可不填</span></label><input id="a-last4" inputmode="numeric" maxlength="4" value="${esc(v.last4 || '')}" placeholder="1234"></div>
+    <div id="a-cardbox"><label>每月幾號結算</label>
+      <input id="a-sd" type="number" inputmode="numeric" min="1" max="28" value="${v.statementDay || ''}" placeholder="例如：18">
+      <label>繳費日怎麼算</label>
+      <div class="seg seg2" id="a-pm"><button type="button" data-pm="free" class="${pm === 'free' ? 'on' : ''}">最長免息幾天</button><button type="button" data-pm="day" class="${pm === 'day' ? 'on' : ''}">每月固定幾號</button></div>
+      <div id="a-fdbox"><div class="bankchips" id="a-fds">${FREE.map(n => `<button type="button" data-fd="${n}" class="${+v.freeDays === n ? 'on' : ''}">${n} 天</button>`).join('')}</div>
+        <input id="a-fd" type="number" inputmode="numeric" min="1" max="90" value="${v.freeDays || ''}" placeholder="或自己填，例如：55"></div>
+      <div id="a-pdbox"><input id="a-pd" type="number" inputmode="numeric" min="1" max="31" value="${v.payDay || ''}" placeholder="每月幾號繳，例如：5"></div>
+      <p class="hint due-preview" id="a-due"></p>
       <div class="fsec">回饋方案（里程、現金回饋） <button class="txt strong" id="a-addplan" type="button">＋ 新增</button></div>
       <div class="list">${plans.length ? plans.map((p, n) => `<button type="button" class="lrow" data-pn="${n}"><span class="lv big">${esc(planLabel(p))}${p.isDefault ? '<small>預設</small>' : ''}${p.cap ? `<small>每期上限 ${p.kind === 'cash' ? money(p.cap) : p.cap + ' 哩'}</small>` : ''}</span><span class="chev">›</span></button>`).join('')
         : '<p class="empty" style="padding:10px 12px">還沒有回饋方案。例如里程卡：按「＋ 新增」→ 里程回饋 → 每花 A$2.5 累積 1 哩。</p>'}</div></div>
@@ -386,25 +417,48 @@ function editAccount(a, back, draft) {
     <p class="hint">${isNew ? '輸入現在的金額就好，之後每記一筆會自動加減。' : '如果跟銀行對不起來，直接改成正確金額，App 會自動校正。'}</p>
     <p class="err" id="a-err"></p>
     ${isNew ? '' : '<div class="btns"><button class="danger" id="a-del">刪除帳戶</button></div>'}`);
-  const paint = () => { $('#a-bal-l').textContent = type === 'credit' ? '現在欠多少（未繳的卡費）' : '現在有多少錢'; $('#a-cardbox').hidden = type !== 'credit'; };
+  const curName = () => type === 'cash' ? (a && a.type === 'cash' ? a.name : '現金') : bank === '__other' ? $('#a-name').value.trim() : bank;
+  const tmpAcc = () => ({ statementDay: parseInt($('#a-sd').value, 10) || '', payMode: pm, payDay: parseInt($('#a-pd').value, 10) || '', freeDays: parseInt($('#a-fd').value, 10) || '' });
+  const paintDue = () => {
+    $('#a-fdbox').hidden = pm !== 'free'; $('#a-pdbox').hidden = pm !== 'day';
+    $('#a-fds').querySelectorAll('button').forEach(z => z.classList.toggle('on', +z.dataset.fd === +$('#a-fd').value));
+    const t = tmpAcc(), n = nextDue(t);
+    $('#a-due').innerHTML = pm === 'free' && !t.statementDay ? '要先填結算日，才算得出繳費日。'
+      : n ? `${n.s ? `${mdFmt(n.s)} 結算 → ` : ''}<b>${mdFmt(n.due)} 前要繳</b>。行事曆那天會有「💳 繳費」提醒。` : '';
+  };
+  const paint = () => {
+    $('#a-bal-l').textContent = type === 'credit' ? '現在欠多少（未繳的卡費）' : '現在有多少錢';
+    $('#a-cardbox').hidden = type !== 'credit'; $('#a-namebox').hidden = type === 'cash';
+    $('#a-name').hidden = bank !== '__other';
+    $('#a-namehint').textContent = bank && bank !== '__other' && db.accounts.some(z => z !== a && z.name === bank && z.type === type) ? `已經有一個 ${bank} 了。要分開的話按「其他」取名，例如「${bank} 儲蓄」。` : '';
+    paintDue();
+  };
   paint();
   $('#a-type').onclick = e => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.k;
     $('#a-type').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); };
+  $('#a-banks').onclick = e => { const b = e.target.closest('button'); if (!b) return; bank = b.dataset.b;
+    $('#a-banks').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paint(); if (bank === '__other') $('#a-name').focus(); };
+  $('#a-pm').onclick = e => { const b = e.target.closest('button'); if (!b) return; pm = b.dataset.pm;
+    $('#a-pm').querySelectorAll('button').forEach(z => z.classList.toggle('on', z === b)); paintDue(); };
+  $('#a-fds').onclick = e => { const b = e.target.closest('button'); if (!b) return; $('#a-fd').value = b.dataset.fd; paintDue(); };
+  ['#a-sd', '#a-fd', '#a-pd'].forEach(s => $(s).oninput = paintDue);
   $('#a-last4').oninput = () => { $('#a-last4').value = $('#a-last4').value.replace(/\D/g, '').slice(0, 4); };
   $('#a-cancel').onclick = back || closeSheet;
   // 去新增／修改回饋方案：先收好表單，方案頁按儲存或取消都回到這裡
-  const keep = () => ({ name: $('#a-name').value, type, last4: $('#a-last4').value, statementDay: $('#a-sd').value, payDay: $('#a-pd').value, bal: $('#a-bal').value, plans });
+  const keep = () => ({ name: curName(), type, last4: $('#a-last4').value, statementDay: $('#a-sd').value, payDay: $('#a-pd').value, payMode: pm, freeDays: $('#a-fd').value, bal: $('#a-bal').value, plans });
   $('#a-addplan').onclick = () => { const d = keep(); editPlan(d, null, () => editAccount(a, back, d)); };
   $('#sheet').querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { const d = keep(); editPlan(d, plans[+b.dataset.pn], () => editAccount(a, back, d)); });
   $('#a-save').onclick = () => {
-    const name = $('#a-name').value.trim();
-    if (!name) return $('#a-err').textContent = '請寫帳戶名稱';
+    const name = curName();
+    if (!name) return $('#a-err').textContent = bank === '__other' ? '請寫帳戶名稱' : '請選是哪一家';
     let want = parseFloat($('#a-bal').value) || 0;
     if (type === 'credit') want = -Math.abs(want);
     const sd = parseInt($('#a-sd').value, 10);
     const pd = parseInt($('#a-pd').value, 10);
     const acc = a || { id: uid(), init: 0, plans: [], rebates: [] };
-    Object.assign(acc, { name, type, last4: $('#a-last4').value, statementDay: type === 'credit' && sd >= 1 && sd <= 28 ? sd : '', payDay: type === 'credit' && pd >= 1 && pd <= 31 ? pd : '' });
+    const fd = parseInt($('#a-fd').value, 10), cr = type === 'credit';
+    Object.assign(acc, { name, type, last4: type === 'cash' ? '' : $('#a-last4').value, statementDay: cr && sd >= 1 && sd <= 28 ? sd : '',
+      payMode: cr ? pm : '', payDay: cr && pm === 'day' && pd >= 1 && pd <= 31 ? pd : '', freeDays: cr && pm === 'free' && fd >= 1 && fd <= 90 ? fd : '' });
     if (type === 'credit') {                    // v2.5 方案在這裡存；刪掉的方案，以前套用它的帳改成不套用
       const ids = new Set(plans.map(p => p.id));
       db.expenses.forEach(x => { if (x.acct === acc.id && x.plan && !ids.has(x.plan)) x.plan = ''; });
@@ -434,7 +488,9 @@ function openCard(a) {
     <div class="shead"><button class="txt" id="k-close">關閉</button><b>${esc(a.name)}</b><button class="txt strong" id="k-edit">編輯</button></div>
     <div class="card"><div class="mbal" style="border:0;margin:0;padding:0"><span>目前欠款</span><b class="${bal < 0 ? 'neg' : ''}">${money(Math.min(0, bal))}</b></div>
       <div class="mbal"><span>本期消費（${fmt(r.s)}–${fmt(r.e)}${a.statementDay ? '' : '，沒設結算日先用整個月'}）</span><b>${money(r.spend)}</b></div>
-      <p class="hint">${r.n} 筆</p></div>
+      <p class="hint">${r.n} 筆</p>
+      ${(() => { const n = nextDue(a); if (!n) return '<p class="hint">還沒設繳費日（按右上角「編輯」）。</p>'; const left = Math.round((parseYmd(n.due) - parseYmd(ymd(new Date()))) / 864e5);
+        return `<div class="mbal"><span>下次繳費${n.s ? `（${mdFmt(n.s)} 結算那期）` : ''}</span><b class="${left <= 3 ? 'neg' : ''}">${mdFmt(n.due)}・${left ? `還有 ${left} 天` : '今天'}</b></div>`; })()}</div>
     <div class="card">
       <div class="mbal" style="border:0;margin:0;padding:0"><span>本期預估回饋</span><b class="pos">${rebateText(r.cash, r.miles)}</b></div>
       ${r.lines.map(l => `<div class="pline"><span>${esc(planLabel(l.p))}<small>消費 ${money(l.spend)}${l.p.cap ? `・上限 ${l.p.kind === 'cash' ? money(l.p.cap) : num1(l.p.cap) + ' 哩'}` : ''}</small></span>
