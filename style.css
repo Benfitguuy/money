@@ -461,3 +461,15 @@ body.th-money #sheet{background:#F7F7F4}
 
 /* v1.9 歡迎回來 */
 #money-title small.hello-date{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
+
+/* v2.0 上面不要霧霧的：標題列改成實心底色、不模糊 */
+body.th-money header{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+.hello-cat{width:34px;height:34px;vertical-align:-6px;margin-left:4px}
+.hello-cat .wave{animation:wave 1.4s ease-in-out infinite}.hello-cat .w2{animation-delay:.2s}
+@keyframes wave{0%,100%{opacity:0}50%{opacity:1}}
+/* 人走路：腳擺動 */
+.person.moving .leg.l1{animation:legs .45s ease-in-out infinite;transform-box:fill-box;transform-origin:top}
+.person.moving .leg.l2{animation:legs .45s ease-in-out infinite reverse;transform-box:fill-box;transform-origin:top}
+.isl-emote{pointer-events:none}
+.isl-emote.pop{animation:emote 2.6s ease-out forwards}
+@keyframes emote{0%{opacity:0;translate:0 6px;scale:.6}15%{opacity:1;translate:0 0;scale:1.15}25%{scale:1}80%{opacity:1;translate:0 -8px}100%{opacity:0;translate:0 -14px}}
