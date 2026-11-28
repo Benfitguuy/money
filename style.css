@@ -480,3 +480,20 @@ body.th-money header{background:var(--bg);-webkit-backdrop-filter:none;backdrop-
 .flower-strip{margin:2px 0 -4px;padding:0 6px}.flower-strip .flowers{height:38px}
 .sway{animation:sway 3.2s ease-in-out infinite;transform-box:view-box}
 @keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+
+/* v2.2 誰記的、商店、小島的太陽雲花、存錢筒小豬 */
+.xtn{display:flex;align-items:center;gap:6px;min-width:0}
+.bytag{flex:none;font-style:normal;font-size:10px;font-weight:700;padding:1px 6px;border-radius:7px;background:#EEEDEA;color:#8E928C}
+.bytag.by-ben{background:#EEEDFE;color:#5A52B0}.bytag.by-sarah{background:#EAF3DE;color:#3F6B1E}
+.bytag.by-import{background:#F1EFE9;color:#9A8F7A}.bytag.by-shortcut{background:#E3F0F8;color:#3E7398}
+.pickbtn{flex:none;padding:5px 9px;border-radius:10px;background:#ECEBE6;font-size:13px;margin-left:6px}
+.who2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.who2 button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0;border-radius:18px;background:#fff;border:2px solid #E7E6E1;font-size:17px;font-weight:700}
+.who2 button.on{border-color:#6E9478;background:#EEF4EF}.who2 svg{width:64px;height:110px}
+.cloud.c3{animation-duration:40s;animation-delay:-6s}.cloud.c4{animation-duration:30s;animation-delay:-20s}.cloud.c5{animation-duration:46s;animation-delay:-30s}
+.sun-rays{animation:spin 20s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.isl-sun{animation:sunbob 5s ease-in-out infinite}@keyframes sunbob{50%{translate:0 -2px}}
+.ifl{animation:ifl 3s ease-in-out infinite;transform-box:fill-box;transform-origin:bottom}@keyframes ifl{0%,100%{rotate:-6deg}50%{rotate:6deg}}
+.hello-pig{width:40px;height:33px;vertical-align:-5px;margin-left:4px}
+.hello-pig .coin{animation:coin 2.6s ease-in infinite}
+@keyframes coin{0%{transform:translateY(-4px);opacity:0}20%{opacity:1}55%{transform:translateY(9px);opacity:1}65%,100%{transform:translateY(10px);opacity:0}}
