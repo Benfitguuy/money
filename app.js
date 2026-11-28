@@ -634,7 +634,7 @@ let petRaf = 0;
 function walkable(x, y) {
   if (Math.abs(x - 190) / 160 + Math.abs(y - 121) / 86 > 0.8) return false;          // 島的邊緣
   if (((x - 271) / 48) ** 2 + ((y - 128) / 32) ** 2 < 1) return false;               // 池塘
-  if (x > 136 && x < 202 && y > 52 && y < 108) return false;                          // 房子
+  if (x > 136 && x < 202 && y > 42 && y < 98) return false;                          // 房子
   if (x > 76 && x < 132 && y > 108 && y < 142) return false;                          // 車子
   return true;
 }
@@ -689,11 +689,29 @@ function renderIsland(net) {
     <path d="M30 128 Q30 112 48 104 L172 48 Q190 40 208 48 L332 104 Q350 112 350 128 L350 146 Q350 160 332 168 L208 222 Q190 230 172 222 L48 168 Q30 160 30 146Z" fill="#E9D8B8"/>
     <path d="M30 128 Q30 112 48 104 L172 48 Q190 40 208 48 L332 104 Q350 112 350 128 L350 138 Q350 152 332 160 L208 214 Q190 222 172 214 L48 160 Q30 152 30 138Z" fill="#A8C98F"/>
     <path d="M30 122 Q30 106 48 98 L172 42 Q190 34 208 42 L332 98 Q350 106 350 122 Q350 136 332 144 L208 200 Q190 208 172 200 L48 144 Q30 136 30 122Z" fill="#C3DFA8"/>
+    <defs><clipPath id="pondclip"><path d="M232 120 Q236 104 258 104 L300 112 Q318 118 310 134 L290 150 Q276 160 256 152 L238 140 Q228 132 232 120Z"/></clipPath></defs>
+    <path d="M232 120 Q236 104 258 104 L300 112 Q318 118 310 134 L290 150 Q276 160 256 152 L238 140 Q228 132 232 120Z" fill="#8FC2D8" stroke="#D9CDB7" stroke-width="5" stroke-linejoin="round"/>
     <path class="water" d="M232 120 Q236 104 258 104 L300 112 Q318 118 310 134 L290 150 Q276 160 256 152 L238 140 Q228 132 232 120Z" fill="#9CC9DE"/>
-    <path class="shine" d="M250 122 h18 M262 134 h22" stroke="#E6F4FA" stroke-width="3" stroke-linecap="round"/>
+    <g clip-path="url(#pondclip)">
+      <path d="M240 140 Q262 150 290 146" stroke="#86BBD2" stroke-width="6" fill="none" opacity=".6"/>
+      <g><path d="M5 0 Q2 -3 -3 -2.2 L-7 -4 L-6 0 L-7 4 L-3 2.2 Q2 3 5 0Z" fill="#F28C52"/><circle cx="1" cy="-.6" r="1.1" fill="#fff" opacity=".8"/>
+        <animateMotion dur="12s" repeatCount="indefinite" rotate="auto" path="M248 126 C258 112 296 114 302 126 C308 140 276 150 258 143 C244 138 242 132 248 126Z"/></g>
+      <g><path d="M4.4 0 Q2 -2.6 -2.6 -2 L-6 -3.4 L-5.2 0 L-6 3.4 L-2.6 2 Q2 2.6 4.4 0Z" fill="#FFF4EA"/><circle cx="0" cy="0" r="1.4" fill="#F06E4A"/>
+        <animateMotion dur="9s" begin="-4s" repeatCount="indefinite" rotate="auto" path="M296 132 C288 146 258 146 252 134 C248 122 272 116 286 120 C296 123 300 128 296 132Z"/></g>
+      <circle cx="270" cy="128" r="3" fill="none" stroke="#E6F4FA" stroke-width="1"><animate attributeName="r" values="1;9" dur="3.5s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;0" dur="3.5s" repeatCount="indefinite"/></circle>
+    </g>
+    <path class="shine" d="M250 116 h12 M280 140 h14" stroke="#E6F4FA" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M241 128 a7 4.5 0 1 1 6 3.6 l-5 -2.4z" fill="#86BE7E"/>
+    <path d="M296 141 a9 5.5 0 1 1 7 4.4 l-6.5 -3z" fill="#7DB476"/><circle cx="305" cy="139" r="2.2" fill="#F6B6C8"/>
+    <g class="frog" transform="translate(290,140)">
+      <ellipse cx="0" cy="0" rx="5.5" ry="3.6" fill="#7CC36B"/><ellipse cx="0" cy="1" rx="3.6" ry="2.2" fill="#B9E3A6"/>
+      <circle cx="-2.6" cy="-3.2" r="2" fill="#7CC36B"/><circle cx="2.6" cy="-3.2" r="2" fill="#7CC36B"/>
+      <circle cx="-2.6" cy="-3.4" r="1" fill="#fff"/><circle cx="2.6" cy="-3.4" r="1" fill="#fff"/>
+      <circle cx="-2.5" cy="-3.3" r=".55" fill="#2E2A2A"/><circle cx="2.7" cy="-3.3" r=".55" fill="#2E2A2A"/>
+      <path d="M-1.6 -.6 Q0 .6 1.6 -.6" stroke="#3F7A35" stroke-width=".6" fill="none" stroke-linecap="round"/></g>
     <path d="M150 196 Q170 160 200 150 Q216 146 228 136" stroke="#EADCC0" stroke-width="14" fill="none" stroke-linecap="round"/>
     ${T}
-    <g transform="translate(146,50)"><rect x="0" y="22" width="44" height="30" rx="4" fill="#fff" stroke="#E2CDB4" stroke-width="2"/>
+    <g transform="translate(146,40)"><rect x="0" y="22" width="44" height="30" rx="4" fill="#fff" stroke="#E2CDB4" stroke-width="2"/>
       <path d="M-6 25 Q-6 22 -3 20 L19 4 Q22 1 25 4 L47 20 Q50 22 50 25Z" fill="#A9CDF0"/><path d="M4 14 L19 4 Q22 1 25 4 L40 14Z" fill="#FBD98A"/><path d="M12 8.6 L19 4 Q22 1 25 4 L32 8.6Z" fill="#F7B6C8"/>
       <rect x="17" y="34" width="10" height="18" rx="2" fill="#F7B6C8"/><rect x="5" y="30" width="8" height="8" rx="2" fill="#A9CDF0"/><rect x="31" y="30" width="8" height="8" rx="2" fill="#FBD98A"/></g>
     <g class="car" transform="translate(104,126)">
