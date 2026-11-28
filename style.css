@@ -511,3 +511,7 @@ body.th-money .island{background:linear-gradient(#BFE2F4 0%,#DCF0F4 42%,#F4FAF6 
 @keyframes flex{50%{translate:0 -2px}}
 .pet.play .walk{animation:pounce .9s ease-in-out infinite}
 @keyframes pounce{0%,100%{translate:0 0}40%{translate:0 -7px}60%{translate:0 -6px}}
+
+/* v2.5 */
+.ins-ended .pcard{opacity:.6}
+#a-cardbox .list{margin-bottom:6px}
