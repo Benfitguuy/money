@@ -51,3 +51,14 @@ function charCat(gid = 'catmask') {
     <path d="M13.5 -18 h1.8 l-.9 1.05z" fill="#E79AA8"/>
     <path d="M14.4 -16.9 q-1 1.2 -2 .4 M14.4 -16.9 q1 1.2 2 .4" stroke="#2E2226" stroke-width=".55" fill="none" stroke-linecap="round"/>`;
 }
+
+// 澳洲卡爾比犬（黑褐色）：腳底在 (0,0)，面向右邊。錢包小島、行事曆小房子共用（2026-11-28 從錢包 app.js 搬過來）
+function charDog() {
+  return `<ellipse cx="0" cy="0" rx="13" ry="2.8" fill="#000" opacity=".12"/>
+      <path d="M-12 -12 Q-20 -10 -21 -3" stroke="#2E2A2A" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <rect class="leg l1" x="-10" y="-7" width="4" height="7" rx="2" fill="#C98A4B"/><rect class="leg l2" x="5" y="-7" width="4" height="7" rx="2" fill="#C98A4B"/>
+      <ellipse cx="-2" cy="-11" rx="13" ry="6.5" fill="#2E2A2A"/><ellipse cx="7" cy="-9" rx="4" ry="4" fill="#C98A4B"/>
+      <path d="M8 -22 L9 -32 L13 -24Z M14 -24 L18 -33 L19 -23Z" fill="#2E2A2A"/>
+      <ellipse cx="14" cy="-19" rx="7" ry="6.5" fill="#2E2A2A"/><path d="M15 -17 Q22 -17 23 -14 Q20 -12 15 -13Z" fill="#C98A4B"/>
+      <circle cx="22.5" cy="-15" r="1.3" fill="#1A1515"/><circle cx="13" cy="-21" r="1" fill="#C98A4B"/><circle cx="14.5" cy="-20" r="1.2" fill="#fff"/><circle cx="14.7" cy="-20" r=".7" fill="#1A1515"/>`;
+}
