@@ -28,7 +28,7 @@ function charSarah() {
     <image href="icons/girl.svg" x="-15" y="-55" width="30" height="30"/>`;
 }
 
-// 布偶貓（海豹重點色）：大頭、藍色大眼睛、白圍脖、深色腳和尾巴
+// 布偶貓（海豹重點色）：大頭、藍色大眼睛、深色腳和尾巴（2026-11-28 Sarah：脖子那圈白毛不要）
 function charCat(gid = 'catmask') {
   const L = `stroke="${CHAR_LINE}" stroke-width=".7" stroke-linejoin="round"`;
   return `<defs><radialGradient id="${gid}" cx="50%" cy="62%" r="58%"><stop offset="0" stop-color="#4E3628" stop-opacity=".95"/><stop offset=".55" stop-color="#6E4E3C" stop-opacity=".7"/><stop offset="1" stop-color="#8A6A55" stop-opacity="0"/></radialGradient></defs>
@@ -38,7 +38,6 @@ function charCat(gid = 'catmask') {
     <ellipse cx="-1" cy="-10" rx="12" ry="7.2" fill="#F3E8DA" ${L}/>
     <path d="M-11.6 -12 Q-1 -18.6 9.6 -13.4 Q-1 -15.4 -11.6 -10.2Z" fill="#D9C2AA"/>
     <rect class="leg l1" x="-5" y="-6" width="4.2" height="6" rx="2.1" fill="#5B4033"/><rect class="leg l2" x="7.4" y="-6" width="4.2" height="6" rx="2.1" fill="#5B4033"/>
-    <path d="M4.6 -16.6 Q12.6 -14 12.4 -7.4 Q10.6 -5.6 9.4 -7.4 Q8.2 -4.6 6.2 -6.6 Q4.4 -4.8 3.8 -8.6Z" fill="#fff"/>
     <path d="M5.2 -24 L5.8 -35.4 L13.2 -28.4Z M16.8 -28.4 L23.4 -35.4 L23.6 -24Z" fill="#5B4033" ${L}/>
     <path d="M6.8 -26.4 L7.2 -32.4 L11.2 -28.6Z M18.6 -28.6 L22.2 -32.4 L22.2 -26.4Z" fill="#E8B4B8"/>
     <ellipse cx="14.4" cy="-21.4" rx="10.2" ry="9.2" fill="#F7F0E6" ${L}/>
